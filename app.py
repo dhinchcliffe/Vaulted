@@ -21,7 +21,8 @@ def get_file_tree(path, relative_to=None):
     tree = []
     try:
         entries = sorted(os.listdir(path))
-    except (OSError, PermissionError):
+    except (OSError, PermissionError) as e:
+        app.logger.warning(f"Could not list directory {path}: {e}")
         return tree
     
     for entry in entries:
@@ -31,20 +32,25 @@ def get_file_tree(path, relative_to=None):
         full_path = os.path.join(path, entry)
         rel_path = os.path.relpath(full_path, relative_to)
         
-        if os.path.isdir(full_path):
-            children = get_file_tree(full_path, relative_to)
-            tree.append({
-                'name': entry,
-                'path': rel_path,
-                'type': 'directory',
-                'children': children
-            })
-        elif entry.endswith('.md'):
-            tree.append({
-                'name': entry,
-                'path': rel_path,
-                'type': 'file'
-            })
+        try:
+            if os.path.isdir(full_path):
+                children = get_file_tree(full_path, relative_to)
+                tree.append({
+                    'name': entry,
+                    'path': rel_path,
+                    'type': 'directory',
+                    'children': children
+                })
+            elif entry.endswith('.md'):
+                tree.append({
+                    'name': entry,
+                    'path': rel_path,
+                    'type': 'file'
+                })
+        except (OSError, PermissionError) as e:
+            # Skip files that can't be accessed (sparse sync)
+            app.logger.debug(f"Skipping {full_path}: {e}")
+            continue
     
     return tree
 
@@ -56,7 +62,10 @@ def find_first_markdown(path):
             dirs[:] = [d for d in dirs if not d.startswith('.')]
             for file in sorted(files):
                 if file.endswith('.md'):
-                    return os.path.relpath(os.path.join(root, file), path)
+                    full_path = os.path.join(root, file)
+                    # Verify file is accessible (not sparse)
+                    if os.path.getsize(full_path) >= 0:
+                        return os.path.relpath(full_path, path)
     except Exception:
         pass
     return None
@@ -123,6 +132,34 @@ def get_first():
     """Get the first markdown file path."""
     first = find_first_markdown(VAULT_PATH)
     return jsonify({'path': first})
+
+@app.route('/api/status')
+def get_status():
+    """Get vault status info."""
+    try:
+        total_files = 0
+        accessible_files = 0
+        for root, dirs, files in os.walk(VAULT_PATH):
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            for file in files:
+                if file.endswith('.md'):
+                    total_files += 1
+                    try:
+                        full_path = os.path.join(root, file)
+                        # Try to stat the file
+                        os.stat(full_path)
+                        accessible_files += 1
+                    except (OSError, PermissionError):
+                        pass
+        
+        return jsonify({
+            'vault_path': VAULT_PATH,
+            'total_markdown_files': total_files,
+            'accessible_files': accessible_files,
+            'sync_status': 'syncing' if accessible_files < total_files else 'synced'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     print(f"Vaulted starting...")

@@ -39,6 +39,36 @@ body {
     letter-spacing: 0.5px;
 }
 
+.vault-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #808080;
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #808080;
+}
+
+.status-dot.synced {
+    background: #4ec9b0;
+}
+
+.status-dot.syncing {
+    background: #ce9178;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 .tree {
     flex: 1;
     overflow-y: auto;

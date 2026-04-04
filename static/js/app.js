@@ -20,6 +20,7 @@ const saveStatus = document.getElementById('saveStatus');
 
 // Initialize
 async function init() {
+    await loadVaultStatus();
     await loadFileTree();
     
     // Try to load last opened file from localStorage
@@ -32,6 +33,30 @@ async function init() {
     }
     
     setupEventListeners();
+    
+    // Refresh status periodically
+    setInterval(loadVaultStatus, 10000);
+}
+
+// Load vault status
+async function loadVaultStatus() {
+    try {
+        const response = await fetch('/api/status');
+        const status = await response.json();
+        
+        const dot = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
+        
+        if (status.sync_status === 'synced') {
+            dot.className = 'status-dot synced';
+            text.textContent = `${status.accessible_files} files`;
+        } else {
+            dot.className = 'status-dot syncing';
+            text.textContent = `Syncing ${status.accessible_files}/${status.total_markdown_files}`;
+        }
+    } catch (error) {
+        console.error('Failed to load status:', error);
+    }
 }
 
 // Load file tree
