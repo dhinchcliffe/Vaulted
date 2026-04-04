@@ -107,7 +107,7 @@ vaulted/
 4. **Single vault** - Hardcoded to one vault path
 
 ## Future Enhancements (Ideas)
-- [ ] Image/file attachment support
+- [x] Image/file attachment support (added v0.9.1)
 - [ ] Obsidian wiki-link parsing
 - [ ] Full-text search
 - [ ] Tag browser
@@ -115,6 +115,11 @@ vaulted/
 - [ ] Multiple vault support
 
 ## Version History
+- **v0.9.1** (2026-04-04) - Image rendering support
+  - Added `/api/attachment/<path>` endpoint for serving images
+  - Custom marked renderer to rewrite image paths
+  - Supports relative paths and Obsidian-style image references
+
 - **v0.9** (2026-04-04) - Baseline release with vault sync support
   - Tree view, markdown editor, auto-save, undo
   - Sparse sync handling for Dropbox

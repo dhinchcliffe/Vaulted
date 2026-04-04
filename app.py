@@ -171,6 +171,25 @@ def get_status():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/attachment/<path:filepath>')
+def get_attachment(filepath):
+    """Serve image attachments from the vault."""
+    # Security: ensure the path stays within the vault
+    full_path = os.path.normpath(os.path.join(VAULT_PATH, filepath))
+    if not full_path.startswith(os.path.normpath(VAULT_PATH)):
+        return jsonify({'error': 'Invalid path'}), 403
+    
+    # Get directory and filename
+    directory = os.path.dirname(full_path)
+    filename = os.path.basename(full_path)
+    
+    try:
+        return send_from_directory(directory, filename)
+    except FileNotFoundError:
+        return jsonify({'error': 'File not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     print(f"Vaulted starting...")
     print(f"Vault path: {VAULT_PATH}")

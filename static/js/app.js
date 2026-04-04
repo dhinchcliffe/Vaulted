@@ -183,7 +183,35 @@ async function loadFile(path) {
 
 // Render markdown preview
 function renderPreview(content) {
-    preview.innerHTML = marked.parse(content);
+    // Rewrite image paths to use our attachment endpoint
+    const vaultBase = currentFile ? currentFile.substring(0, currentFile.lastIndexOf('/') + 1) : '';
+    
+    // Custom renderer for images
+    const renderer = new marked.Renderer();
+    renderer.image = (href, title, text) => {
+        // If href is a relative path (not URL), rewrite it
+        if (href && !href.match(/^https?:\/\//)) {
+            // Handle Obsidian-style paths
+            let imagePath = href;
+            
+            // Remove leading ./ if present
+            if (imagePath.startsWith('./')) {
+                imagePath = imagePath.substring(2);
+            }
+            
+            // If path doesn't start with /, it's relative to current file
+            if (!imagePath.startsWith('/')) {
+                imagePath = vaultBase + imagePath;
+            }
+            
+            href = '/api/attachment/' + encodeURIComponent(imagePath);
+        }
+        
+        const titleAttr = title ? ` title="${title}"` : '';
+        return `<img src="${href}" alt="${text}"${titleAttr} style="max-width: 100%;">`;
+    };
+    
+    preview.innerHTML = marked.parse(content, { renderer });
 }
 
 // Update view based on editing state
