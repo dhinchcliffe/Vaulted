@@ -28,7 +28,7 @@ A minimal, elegant web-based viewer and editor for Obsidian vaults.
 
 The vault path is configured in `app.py`:
 ```python
-VAULT_PATH = os.path.expanduser("~/Dropbox/Apps/remotely_save/DPH Research")
+VAULT_PATH = os.path.expanduser("~/Dropbox/Apps/remotely-save/DPH Research")
 ```
 
 ## Auto-start

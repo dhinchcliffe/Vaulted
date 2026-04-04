@@ -11,7 +11,7 @@ from flask import Flask, render_template, jsonify, request, send_from_directory
 app = Flask(__name__)
 
 # Vault path - your Obsidian vault
-VAULT_PATH = os.path.expanduser("~/Dropbox/Apps/remotely_save/DPH Research")
+VAULT_PATH = os.path.expanduser("~/Dropbox/Apps/remotely-save/DPH Research")
 
 def get_file_tree(path, relative_to=None):
     """Build a tree structure of the vault directory."""
@@ -55,7 +55,7 @@ def get_file_tree(path, relative_to=None):
     return tree
 
 def find_first_markdown(path):
-    """Find the first markdown file in the vault."""
+    """Find the first accessible markdown file in the vault."""
     try:
         for root, dirs, files in os.walk(path):
             # Skip hidden directories
@@ -64,8 +64,12 @@ def find_first_markdown(path):
                 if file.endswith('.md'):
                     full_path = os.path.join(root, file)
                     # Verify file is accessible (not sparse)
-                    if os.path.getsize(full_path) >= 0:
+                    try:
+                        with open(full_path, 'rb') as f:
+                            f.read(1)
                         return os.path.relpath(full_path, path)
+                    except (OSError, IOError):
+                        continue
     except Exception:
         pass
     return None
@@ -94,11 +98,16 @@ def get_file():
         return jsonify({'error': 'Invalid path'}), 403
     
     try:
+        # Check if file is accessible (not sparse)
         with open(full_path, 'r', encoding='utf-8') as f:
             content = f.read()
         return jsonify({'content': content, 'path': filepath})
     except FileNotFoundError:
         return jsonify({'error': 'File not found'}), 404
+    except OSError as e:
+        if e.errno == 11:  # EDEADLK - Resource deadlock avoided (sparse file)
+            return jsonify({'error': 'File not downloaded yet. Please open in Finder to download.'}), 503
+        return jsonify({'error': str(e)}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -146,10 +155,11 @@ def get_status():
                     total_files += 1
                     try:
                         full_path = os.path.join(root, file)
-                        # Try to stat the file
-                        os.stat(full_path)
+                        # Try to read first byte to check if file is accessible
+                        with open(full_path, 'rb') as f:
+                            f.read(1)
                         accessible_files += 1
-                    except (OSError, PermissionError):
+                    except (OSError, PermissionError, IOError):
                         pass
         
         return jsonify({
