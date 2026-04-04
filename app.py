@@ -387,4 +387,4 @@ if __name__ == '__main__':
     print(f"Vaulted starting...")
     print(f"Vault path: {VAULT_PATH}")
     print(f"Open http://localhost:5006 in your browser")
-    app.run(host='0.0.0.0', port=5007, debug=True)
+    app.run(host='0.0.0.0', port=5006, debug=True)
