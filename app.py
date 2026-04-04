@@ -5,7 +5,12 @@ Vaulted - A minimal Obsidian vault viewer and editor
 
 import os
 import json
+import re
+import urllib.request
+import urllib.error
 from pathlib import Path
+from datetime import datetime
+from html.parser import HTMLParser
 from flask import Flask, render_template, jsonify, request, send_from_directory
 
 app = Flask(__name__)
@@ -171,6 +176,194 @@ def get_status():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+class HTMLToMarkdown(HTMLParser):
+    """Simple HTML parser to extract text content for markdown conversion."""
+    def __init__(self):
+        super().__init__()
+        self.text = []
+        self.skip_tags = {'script', 'style', 'nav', 'header', 'footer', 'aside'}
+        self.skip_depth = 0
+        
+    def handle_starttag(self, tag, attrs):
+        if tag in self.skip_tags:
+            self.skip_depth += 1
+        elif tag in ['p', 'div', 'article', 'section']:
+            if self.text and not self.text[-1].endswith('\n\n'):
+                self.text.append('\n\n')
+        elif tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+            if self.text and not self.text[-1].endswith('\n\n'):
+                self.text.append('\n\n')
+            level = int(tag[1])
+            self.text.append('#' * level + ' ')
+        elif tag == 'li':
+            self.text.append('- ')
+        elif tag == 'br':
+            self.text.append('\n')
+        elif tag == 'a':
+            attrs_dict = dict(attrs)
+            if 'href' in attrs_dict:
+                self.current_href = attrs_dict['href']
+        elif tag in ['b', 'strong']:
+            self.text.append('**')
+        elif tag in ['i', 'em']:
+            self.text.append('*')
+            
+    def handle_endtag(self, tag):
+        if tag in self.skip_tags:
+            self.skip_depth -= 1
+        elif tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+            self.text.append('\n\n')
+        elif tag == 'p':
+            self.text.append('\n\n')
+        elif tag == 'a':
+            if hasattr(self, 'current_href'):
+                self.text.append(f']({self.current_href})')
+                delattr(self, 'current_href')
+        elif tag in ['b', 'strong']:
+            self.text.append('**')
+        elif tag in ['i', 'em']:
+            self.text.append('*')
+            
+    def handle_data(self, data):
+        if self.skip_depth == 0:
+            # Clean up whitespace but preserve structure
+            cleaned = ' '.join(data.split())
+            if cleaned:
+                self.text.append(cleaned)
+                
+    def get_markdown(self):
+        result = ''.join(self.text)
+        # Clean up excessive newlines
+        result = re.sub(r'\n{3,}', '\n\n', result)
+        return result.strip()
+
+
+def fetch_web_page(url):
+    """Fetch a web page and extract its content."""
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'identity',
+            }
+        )
+        
+        with urllib.request.urlopen(req, timeout=30) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            
+        # Extract title
+        title_match = re.search(r'<title[^>]*>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
+        title = title_match.group(1).strip() if title_match else 'Untitled'
+        # Clean up title for filename
+        title = re.sub(r'[\\/:*?"<>|]', '', title)
+        
+        # Try to find main content area
+        content_html = html
+        
+        # Look for common content containers
+        content_patterns = [
+            r'<article[^>]*>(.*?)</article>',
+            r'<main[^>]*>(.*?)</main>',
+            r'<div[^>]*class="[^"]*content[^"]*"[^>]*>(.*?)</div>',
+            r'<div[^>]*class="[^"]*article[^"]*"[^>]*>(.*?)</div>',
+            r'<div[^>]*id="[^"]*content[^"]*"[^>]*>(.*?)</div>',
+            r'<div[^>]*id="[^"]*main[^"]*"[^>]*>(.*?)</div>',
+        ]
+        
+        for pattern in content_patterns:
+            match = re.search(pattern, html, re.IGNORECASE | re.DOTALL)
+            if match:
+                content_html = match.group(1)
+                break
+        
+        # Parse HTML to markdown
+        parser = HTMLToMarkdown()
+        parser.feed(content_html)
+        content = parser.get_markdown()
+        
+        return {
+            'title': title,
+            'content': content,
+            'url': url
+        }
+        
+    except urllib.error.HTTPError as e:
+        return {'error': f'HTTP Error {e.code}: {e.reason}'}
+    except urllib.error.URLError as e:
+        return {'error': f'URL Error: {e.reason}'}
+    except Exception as e:
+        return {'error': f'Failed to fetch page: {str(e)}'}
+
+
+@app.route('/api/fetch-web', methods=['POST'])
+def fetch_web():
+    """Fetch a web page and save it to ReadItLater inbox."""
+    data = request.get_json()
+    if not data or 'url' not in data:
+        return jsonify({'error': 'No URL provided'}), 400
+    
+    url = data['url'].strip()
+    if not url:
+        return jsonify({'error': 'Empty URL'}), 400
+    
+    # Add https:// if no protocol specified
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+    
+    # Fetch the page
+    result = fetch_web_page(url)
+    
+    if 'error' in result:
+        return jsonify({'error': result['error']}), 500
+    
+    # Generate filename
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    safe_title = result['title'][:80] if result['title'] else 'untitled'
+    safe_title = re.sub(r'\s+', ' ', safe_title).strip()
+    filename = f"{date_str} - {safe_title}.md"
+    
+    # ReadItLater inbox path
+    inbox_path = os.path.join(VAULT_PATH, 'ReadItLater Inbox', filename)
+    
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(inbox_path), exist_ok=True)
+    
+    # Check if file exists and append number if needed
+    counter = 1
+    original_inbox_path = inbox_path
+    while os.path.exists(inbox_path):
+        name, ext = os.path.splitext(original_inbox_path)
+        inbox_path = f"{name} ({counter}){ext}"
+        counter += 1
+    
+    # Create markdown content
+    markdown_content = f"""[[ReadItLater]] [[Article]]
+
+# [{result['title']}]({result['url']})
+
+{result['content']}
+
+---
+*Saved from {result['url']} on {datetime.now().strftime('%Y-%m-%d %H:%M')}*
+"""
+    
+    try:
+        with open(inbox_path, 'w', encoding='utf-8') as f:
+            f.write(markdown_content)
+        
+        rel_path = os.path.relpath(inbox_path, VAULT_PATH)
+        return jsonify({
+            'success': True,
+            'path': rel_path,
+            'title': result['title']
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to save file: {str(e)}'}), 500
+
+
 @app.route('/api/attachment/<path:filepath>')
 def get_attachment(filepath):
     """Serve image attachments from the vault."""
@@ -194,4 +387,4 @@ if __name__ == '__main__':
     print(f"Vaulted starting...")
     print(f"Vault path: {VAULT_PATH}")
     print(f"Open http://localhost:5006 in your browser")
-    app.run(host='0.0.0.0', port=5006, debug=True)
+    app.run(host='0.0.0.0', port=5007, debug=True)

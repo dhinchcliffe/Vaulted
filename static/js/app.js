@@ -320,6 +320,12 @@ function redo() {
 
 // Setup event listeners
 function setupEventListeners() {
+    // Add Web Page button
+    const addWebBtn = document.getElementById('addWebBtn');
+    if (addWebBtn) {
+        addWebBtn.addEventListener('click', addWebPage);
+    }
+    
     // Edit/Preview buttons
     editBtn.addEventListener('click', () => {
         isEditing = true;
@@ -361,6 +367,46 @@ function setupEventListeners() {
             updateView();
         }
     });
+}
+
+// Add web page by URL
+async function addWebPage() {
+    const url = prompt('Enter URL to fetch:');
+    if (!url || !url.trim()) return;
+    
+    const btn = document.getElementById('addWebBtn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Fetching...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch('/api/fetch-web', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url.trim() })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Refresh file tree to show new file
+            await loadFileTree();
+            // Load the new file
+            await loadFile(data.path);
+            // Show success
+            saveStatus.textContent = `Saved: ${data.title}`;
+            saveStatus.className = 'save-status saved';
+            setTimeout(() => { saveStatus.textContent = ''; }, 3000);
+        } else {
+            alert('Error: ' + (data.error || 'Failed to fetch page'));
+        }
+    } catch (error) {
+        console.error('Failed to fetch web page:', error);
+        alert('Error: Failed to fetch page. Check console for details.');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
 }
 
 // Utility: Escape HTML
