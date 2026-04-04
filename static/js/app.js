@@ -183,35 +183,47 @@ async function loadFile(path) {
 
 // Render markdown preview
 function renderPreview(content) {
-    // Rewrite image paths to use our attachment endpoint
+    // Get the base path for the current file
     const vaultBase = currentFile ? currentFile.substring(0, currentFile.lastIndexOf('/') + 1) : '';
     
-    // Custom renderer for images
+    // Pre-process Obsidian wiki-link style images: ![[image.png]] -> <img> tag directly
+    let processedContent = content.replace(
+        /!\[\[([^\]]+)\]\]/g,
+        (match, imagePath) => {
+            let fullPath = imagePath;
+            if (!imagePath.match(/^https?:\/\//)) {
+                if (imagePath.startsWith('./')) {
+                    imagePath = imagePath.substring(2);
+                }
+                if (!imagePath.startsWith('/')) {
+                    fullPath = vaultBase + imagePath;
+                }
+                fullPath = '/api/attachment/' + encodeURIComponent(fullPath);
+            }
+            return `<img src="${fullPath}" alt="${imagePath}" style="max-width: 100%;">`;
+        }
+    );
+    
+    // Custom renderer for standard markdown images
     const renderer = new marked.Renderer();
-    renderer.image = (href, title, text) => {
-        // If href is a relative path (not URL), rewrite it
+    renderer.image = ({ href, title, text }) => {
+        // If href is a relative path (not URL), rewrite it to use our attachment endpoint
         if (href && !href.match(/^https?:\/\//)) {
-            // Handle Obsidian-style paths
             let imagePath = href;
-            
-            // Remove leading ./ if present
             if (imagePath.startsWith('./')) {
                 imagePath = imagePath.substring(2);
             }
-            
-            // If path doesn't start with /, it's relative to current file
             if (!imagePath.startsWith('/')) {
                 imagePath = vaultBase + imagePath;
             }
-            
             href = '/api/attachment/' + encodeURIComponent(imagePath);
         }
-        
+        // External URLs (https://) pass through unchanged
         const titleAttr = title ? ` title="${title}"` : '';
         return `<img src="${href}" alt="${text}"${titleAttr} style="max-width: 100%;">`;
     };
     
-    preview.innerHTML = marked.parse(content, { renderer });
+    preview.innerHTML = marked.parse(processedContent, { renderer, mangle: false, headerIds: false });
 }
 
 // Update view based on editing state
