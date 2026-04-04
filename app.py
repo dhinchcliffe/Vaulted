@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/Users/dhinchcliffe/openclaw/vaulted/venv/bin/python3
 """
 Vaulted - A minimal Obsidian vault viewer and editor
 """
@@ -127,5 +127,5 @@ def get_first():
 if __name__ == '__main__':
     print(f"Vaulted starting...")
     print(f"Vault path: {VAULT_PATH}")
-    print(f"Open http://localhost:5005 in your browser")
-    app.run(host='0.0.0.0', port=5005, debug=True)
+    print(f"Open http://localhost:5006 in your browser")
+    app.run(host='0.0.0.0', port=5006, debug=True)

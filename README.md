@@ -22,7 +22,7 @@ A minimal, elegant web-based viewer and editor for Obsidian vaults.
    python app.py
    ```
 
-3. Open http://localhost:5005 in your browser
+3. Open http://localhost:5006 in your browser
 
 ## Configuration
 
