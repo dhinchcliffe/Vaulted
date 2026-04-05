@@ -9,7 +9,20 @@
   - New folders (not in saved state) default to expanded
   - Per-client storage (each browser/device has its own state)
 
+### Changed
+- **Improved web page fetching with specialized extractors**:
+  - **Wikipedia pages**: Uses `wikipedia` library for clean, structured content
+    - No edit buttons, navigation, or language links
+    - Clean text with proper section headers
+    - Images not included (text-only extraction)
+  - **General sites**: Uses `markdownify` library for better HTML-to-Markdown conversion
+    - Better handling of article content
+    - Cleaner markdown output
+  - **Fallback**: Legacy parser still available if libraries not installed
+
 ### Fixed
+- **Filename format for saved web pages**: Now `Title - Date.md` instead of `Date - Title.md`
+  - Easier to scan and find articles in ReadItLater Inbox
 - **Wiki-link images try multiple locations**: `![[image.png]]` now finds images in:
   1. Explicit path (if specified: `![[folder/image.png]]`)
   2. Current file's directory (local folder)

@@ -13,6 +13,19 @@ from datetime import datetime
 from html.parser import HTMLParser
 from flask import Flask, render_template, jsonify, request, send_from_directory
 
+# Optional imports for web fetching
+try:
+    import markdownify
+    MARKDOWNIFY_AVAILABLE = True
+except ImportError:
+    MARKDOWNIFY_AVAILABLE = False
+
+try:
+    import wikipedia
+    WIKIPEDIA_AVAILABLE = True
+except ImportError:
+    WIKIPEDIA_AVAILABLE = False
+
 app = Flask(__name__)
 
 # Vault path - your Obsidian vault
@@ -247,7 +260,114 @@ class HTMLToMarkdown(HTMLParser):
         return result.strip()
 
 
+def fetch_wikipedia_page(url):
+    """Fetch a Wikipedia page using the wikipedia library for clean extraction."""
+    try:
+        # Extract page title from URL
+        # URL format: https://en.wikipedia.org/wiki/Page_Title
+        match = re.search(r'wikipedia\.org/wiki/([^#?]+)', url)
+        if not match:
+            return {'error': 'Could not extract Wikipedia page title from URL'}
+        
+        page_title = match.group(1).replace('_', ' ')
+        
+        # Set language based on URL
+        lang_match = re.search(r'https://([a-z]+)\.wikipedia\.org', url)
+        if lang_match:
+            wikipedia.set_lang(lang_match.group(1))
+        else:
+            wikipedia.set_lang('en')
+        
+        # Fetch the page
+        page = wikipedia.page(page_title, auto_suggest=False)
+        
+        # Get content and clean it up
+        content = page.content
+        
+        # Convert to markdown-style formatting
+        # The wikipedia library returns plain text with section headers marked by ==
+        # Convert == Section == to ## Section
+        content = re.sub(r'^== (.+?) ==$', r'## \1', content, flags=re.MULTILINE)
+        content = re.sub(r'^=== (.+?) ===$', r'### \1', content, flags=re.MULTILINE)
+        content = re.sub(r'^==== (.+?) ====$', r'#### \1', content, flags=re.MULTILINE)
+        
+        return {
+            'title': page.title,
+            'content': content,
+            'url': url
+        }
+        
+    except wikipedia.exceptions.DisambiguationError as e:
+        return {'error': f'Ambiguous page title. Options: {", ".join(e.options[:5])}'}
+    except wikipedia.exceptions.PageError:
+        return {'error': 'Wikipedia page not found'}
+    except Exception as e:
+        return {'error': f'Failed to fetch Wikipedia page: {str(e)}'}
+
+
 def fetch_web_page(url):
+    """Fetch a web page and extract its content."""
+    # Check if this is a Wikipedia URL
+    if 'wikipedia.org/wiki/' in url and WIKIPEDIA_AVAILABLE:
+        return fetch_wikipedia_page(url)
+    
+    # For non-Wikipedia pages, use markdownify if available
+    if MARKDOWNIFY_AVAILABLE:
+        return fetch_web_page_markdownify(url)
+    
+    # Fallback to legacy parser
+    return fetch_web_page_legacy(url)
+
+
+def fetch_web_page_markdownify(url):
+    """Fetch web page using markdownify library."""
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Get title
+        title = 'Untitled'
+        if soup.title:
+            title = soup.title.get_text().strip()
+        title = re.sub(r'[\\/:*?"<>|]', '', title)
+        
+        # Try to find main content
+        content_html = str(soup)
+        
+        # Look for article/main content first
+        for selector in ['article', 'main', '[role="main"]', '.article', '.post', '.entry']:
+            elem = soup.select_one(selector)
+            if elem:
+                content_html = str(elem)
+                break
+        
+        # Convert to markdown
+        content = markdownify.markdownify(content_html, heading_style='ATX', strip=['a'])
+        
+        # Clean up excessive whitespace
+        content = re.sub(r'\n{3,}', '\n\n', content)
+        
+        return {
+            'title': title,
+            'content': content.strip(),
+            'url': url
+        }
+        
+    except Exception as e:
+        # Fallback to legacy on error
+        return fetch_web_page_legacy(url)
+
+
+def fetch_web_page_legacy(url):
     """Fetch a web page and extract its content."""
     try:
         req = urllib.request.Request(
@@ -328,11 +448,11 @@ def fetch_web():
     if 'error' in result:
         return jsonify({'error': result['error']}), 500
     
-    # Generate filename
+    # Generate filename (title first, then date for easy scanning)
     date_str = datetime.now().strftime('%Y-%m-%d')
     safe_title = result['title'][:80] if result['title'] else 'untitled'
     safe_title = re.sub(r'\s+', ' ', safe_title).strip()
-    filename = f"{date_str} - {safe_title}.md"
+    filename = f"{safe_title} - {date_str}.md"
     
     # ReadItLater inbox path
     inbox_path = os.path.join(VAULT_PATH, 'ReadItLater Inbox', filename)
@@ -378,8 +498,8 @@ def get_attachment(filepath):
     """Serve image attachments from the vault.
     
     Tries multiple locations in order:
-    1. Explicit path (if filepath contains '/')
-    2. Current file's directory (if context provided via ?from= param)
+    1. Explicit path (if filepath contains /)
+    2. Current file directory (if context provided via from param)
     3. Vault root
     """
     # Security: ensure the path stays within the vault
