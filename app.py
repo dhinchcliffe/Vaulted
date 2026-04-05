@@ -323,8 +323,7 @@ def fetch_wikipedia_page(url):
             # Convert to markdown
             content = markdownify.markdownify(
                 html_content,
-                heading_style='ATX',
-                strip=['a']  # Don't convert links to markdown, keep as is
+                heading_style='ATX'
             )
 
             # Prepend extracted infobox images
