@@ -183,22 +183,22 @@ async function loadFile(path) {
 
 // Render markdown preview
 function renderPreview(content) {
-    // Get the base path for the current file
+    // Get the base path for the current file (for standard markdown images)
     const vaultBase = currentFile ? currentFile.substring(0, currentFile.lastIndexOf('/') + 1) : '';
     
     // Pre-process Obsidian wiki-link style images: ![[image.png]] -> <img> tag directly
+    // Wiki-links resolve from vault root, NOT from the file's directory
     let processedContent = content.replace(
         /!\[\[([^\]]+)\]\]/g,
         (match, imagePath) => {
             let fullPath = imagePath;
             if (!imagePath.match(/^https?:\/\//)) {
+                // Wiki-links are relative to vault root, not file location
+                // Remove leading ./ if present, but don't prepend vaultBase
                 if (imagePath.startsWith('./')) {
                     imagePath = imagePath.substring(2);
                 }
-                if (!imagePath.startsWith('/')) {
-                    fullPath = vaultBase + imagePath;
-                }
-                fullPath = '/api/attachment/' + encodeURIComponent(fullPath);
+                fullPath = '/api/attachment/' + encodeURIComponent(imagePath);
             }
             return `<img src="${fullPath}" alt="${imagePath}" style="max-width: 100%;">`;
         }
