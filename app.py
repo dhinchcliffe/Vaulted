@@ -311,13 +311,25 @@ def fetch_wikipedia_page(url):
             # Remove edit links, navigation, etc.
             html_content = re.sub(r'<span class="mw-editsection[^"]*"[^>]*>.*?</span>', '', html_content, flags=re.DOTALL)
             html_content = re.sub(r'<div class="mw-parser-output">\s*<div class="hatnote[^"]*"[^>]*>.*?</div>', '', html_content, flags=re.DOTALL)
-            
+
+            # Extract infobox images before table conversion (markdownify strips images in tables)
+            infobox_images = []
+            for img_match in re.finditer(r'<td[^>]*class="[^"]*infobox-image[^"]*"[^>]*>.*?<img[^>]+src="([^"]+)"[^>]*>.*?</td>', html_content, re.DOTALL):
+                img_url = img_match.group(1)
+                if img_url.startswith('//'):
+                    img_url = 'https:' + img_url
+                infobox_images.append(f'<img src="{img_url}">')
+
             # Convert to markdown
             content = markdownify.markdownify(
                 html_content,
                 heading_style='ATX',
                 strip=['a']  # Don't convert links to markdown, keep as is
             )
+
+            # Prepend extracted infobox images
+            if infobox_images:
+                content = '\n\n'.join(infobox_images) + '\n\n' + content
             
             # Clean up Wikipedia image URLs - convert relative to absolute
             content = re.sub(
