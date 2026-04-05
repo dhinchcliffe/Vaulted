@@ -18,6 +18,11 @@ const editBtn = document.getElementById('editBtn');
 const previewBtn = document.getElementById('previewBtn');
 const saveStatus = document.getElementById('saveStatus');
 
+// Make file path clickable to reveal in tree
+currentFileLabel.style.cursor = 'pointer';
+currentFileLabel.title = 'Click to reveal in tree';
+currentFileLabel.addEventListener('click', revealCurrentFileInTree);
+
 // Initialize
 async function init() {
     await loadVaultStatus();
@@ -491,18 +496,23 @@ function closeAutoFileModal() {
 function showAutoFileResult(suggestion, reasoning) {
     const loading = document.getElementById('autoFileLoading');
     const result = document.getElementById('autoFileResult');
-    const suggestionEl = document.getElementById('autoFileSuggestion');
+    const suggestionInput = document.getElementById('autoFileSuggestionInput');
     const reasoningEl = document.getElementById('autoFileReasoning');
     const confirmBtn = document.getElementById('confirmFileBtn');
-    
+
     loading.style.display = 'none';
     result.style.display = 'block';
-    
-    suggestionEl.textContent = suggestion;
+
+    suggestionInput.value = suggestion;
     reasoningEl.textContent = reasoning;
-    
-    // Setup confirm button
-    confirmBtn.onclick = () => confirmAutoFile(suggestion);
+
+    // Setup confirm button - reads from input to allow editing
+    confirmBtn.onclick = () => {
+        const editedLocation = suggestionInput.value.trim();
+        if (editedLocation) {
+            confirmAutoFile(editedLocation);
+        }
+    };
 }
 
 function showAutoFileError(message) {
@@ -597,6 +607,46 @@ document.addEventListener('click', (e) => {
         closeAutoFileModal();
     }
 });
+
+// Reveal current file in tree view
+function revealCurrentFileInTree() {
+    if (!currentFile) return;
+
+    // Get all path components except the filename
+    const pathParts = currentFile.split('/');
+    pathParts.pop(); // Remove filename, keep directories
+
+    // Expand each directory in the path
+    let currentPath = '';
+    for (const part of pathParts) {
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
+        const dirEl = document.querySelector(`.tree-item.directory[data-path="${CSS.escape(currentPath)}"]`);
+        if (dirEl && dirEl.classList.contains('collapsed')) {
+            dirEl.classList.remove('collapsed');
+            dirEl.classList.add('expanded');
+            const childrenContainer = dirEl.nextElementSibling;
+            if (childrenContainer) {
+                childrenContainer.style.display = 'block';
+            }
+        }
+    }
+
+    // Save expanded state
+    saveTreeState();
+
+    // Scroll the file into view
+    const fileEl = document.querySelector(`.tree-item[data-path="${CSS.escape(currentFile)}"]`);
+    if (fileEl) {
+        fileEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Flash highlight effect
+        fileEl.style.transition = 'background 0.3s';
+        const originalBg = fileEl.style.background;
+        fileEl.style.background = '#0e639c';
+        setTimeout(() => {
+            fileEl.style.background = originalBg;
+        }, 800);
+    }
+}
 
 // Start
 init();

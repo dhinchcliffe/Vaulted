@@ -467,6 +467,24 @@ body {
     word-break: break-word;
 }
 
+.suggestion-path-input {
+    width: 100%;
+    font-size: 16px;
+    font-weight: 500;
+    color: #4ec9b0;
+    background: #1e1e1e;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    font-family: inherit;
+}
+
+.suggestion-path-input:focus {
+    outline: none;
+    border-color: #4ec9b0;
+}
+
 .suggestion-reasoning {
     font-size: 13px;
     color: #aaa;
