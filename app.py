@@ -594,6 +594,261 @@ def get_attachment(filepath):
     return jsonify({'error': 'File not found'}), 404
 
 
+def compress_tree_for_ai(path, relative_to=None, level=0):
+    """Build a compressed tree structure for AI context.
+    
+    Returns folder structure with file counts instead of full file lists.
+    Limits depth to avoid token explosion.
+    """
+    if relative_to is None:
+        relative_to = path
+    
+    if level > 4:  # Limit depth to 4 levels
+        return []
+    
+    result = []
+    
+    try:
+        entries = os.listdir(path)
+    except (OSError, PermissionError):
+        return []
+    
+    dirs = []
+    files = []
+    
+    for entry in entries:
+        if entry.startswith('.'):
+            continue
+        full_path = os.path.join(path, entry)
+        rel_path = os.path.relpath(full_path, relative_to)
+        try:
+            if os.path.isdir(full_path):
+                dirs.append((entry, rel_path, full_path))
+            elif entry.endswith('.md'):
+                files.append(entry)
+        except (OSError, PermissionError):
+            continue
+    
+    # Add directories with their compressed children
+    for name, rel_path, full_path in sorted(dirs, key=lambda x: x[0].lower()):
+        children = compress_tree_for_ai(full_path, relative_to, level + 1)
+        dir_info = {'name': name, 'type': 'directory', 'children': children}
+        
+        # Count files in this directory (not recursive)
+        try:
+            file_count = len([f for f in os.listdir(full_path) 
+                           if f.endswith('.md') and not f.startswith('.')])
+            if file_count > 0:
+                dir_info['file_count'] = file_count
+        except:
+            pass
+        
+        result.append(dir_info)
+    
+    # Only include files if at root level or if there aren't too many
+    if level == 0 or len(files) <= 5:
+        for name in sorted(files, key=str.lower):
+            result.append({'name': name, 'type': 'file'})
+    else:
+        # Just show count if too many files
+        if files:
+            result.append({'name': f'[{len(files)} files]', 'type': 'file_count'})
+    
+    return result
+
+
+def tree_to_text(tree, indent=0):
+    """Convert compressed tree to text format for AI prompt."""
+    lines = []
+    prefix = '  ' * indent
+    
+    for item in tree:
+        if item['type'] == 'directory':
+            count_str = f" ({item.get('file_count', 0)} files)" if 'file_count' in item else ''
+            lines.append(f"{prefix}{item['name']}/{count_str}")
+            if item.get('children'):
+                lines.extend(tree_to_text(item['children'], indent + 1))
+        elif item['type'] == 'file':
+            lines.append(f"{prefix}- {item['name']}")
+        elif item['type'] == 'file_count':
+            lines.append(f"{prefix}{item['name']}")
+    
+    return lines
+
+
+@app.route('/api/suggest-file-location', methods=['POST'])
+def suggest_file_location():
+    """Use AI to suggest where to file the current document.
+    
+    Expects JSON: {path: "file/path.md", content: "markdown content"}
+    Returns: {suggestion: "Folder/Path", reasoning: "explanation"}
+    """
+    data = request.get_json()
+    if not data or 'path' not in data:
+        return jsonify({'error': 'No file path provided'}), 400
+    
+    filepath = data['path']
+    content = data.get('content', '')
+    
+    # Security check
+    full_path = os.path.normpath(os.path.join(VAULT_PATH, filepath))
+    if not full_path.startswith(os.path.normpath(VAULT_PATH)):
+        return jsonify({'error': 'Invalid path'}), 403
+    
+    # If content not provided, read from file
+    if not content:
+        try:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except Exception as e:
+            return jsonify({'error': f'Could not read file: {str(e)}'}), 500
+    
+    # Get compressed tree structure
+    tree = compress_tree_for_ai(VAULT_PATH)
+    tree_text = '\n'.join(tree_to_text(tree))
+    
+    # Truncate content to first 800 chars (approx 200 tokens)
+    content_preview = content[:800].strip()
+    if len(content) > 800:
+        content_preview += '\n...'
+    
+    # Build prompt for AI
+    prompt = f"""You are organizing a knowledge vault. Given the vault structure and a document, suggest the best folder to file it in.
+
+VAULT STRUCTURE:
+{tree_text}
+
+DOCUMENT (first ~800 chars):
+{content_preview}
+
+Based on the document's content and the existing vault structure, suggest the best folder path to file this document.
+
+Respond in this exact format:
+SUGGESTION: Folder/Subfolder
+REASONING: Brief explanation of why this location fits
+
+If unsure, suggest "ReadItLater Inbox" as the location."""
+    
+    try:
+        # Use OpenAI API with gpt-4o-mini for cost efficiency
+        import openai
+        
+        # Get API key from environment
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if not api_key:
+            # Try to load from .env file
+            env_path = os.path.expanduser('~/.openclaw/.env')
+            if os.path.exists(env_path):
+                with open(env_path, 'r') as f:
+                    for line in f:
+                        if line.startswith('OPENAI_API_KEY='):
+                            api_key = line.strip().split('=', 1)[1].strip().strip('"').strip("'")
+                            break
+        
+        if not api_key:
+            return jsonify({'error': 'OpenAI API key not configured'}), 500
+        
+        client = openai.OpenAI(api_key=api_key)
+        
+        response = client.chat.completions.create(
+            model='gpt-4o-mini',
+            messages=[
+                {'role': 'system', 'content': 'You are a helpful assistant that organizes documents into a knowledge vault. Be concise.'},
+                {'role': 'user', 'content': prompt}
+            ],
+            temperature=0.3,
+            max_completion_tokens=150
+        )
+        
+        ai_response = response.choices[0].message.content.strip()
+        
+        # Parse response
+        suggestion = None
+        reasoning = None
+        
+        for line in ai_response.split('\n'):
+            if line.startswith('SUGGESTION:'):
+                suggestion = line.replace('SUGGESTION:', '').strip()
+            elif line.startswith('REASONING:'):
+                reasoning = line.replace('REASONING:', '').strip()
+        
+        # Fallback parsing
+        if not suggestion:
+            lines = [l.strip() for l in ai_response.split('\n') if l.strip()]
+            if lines:
+                suggestion = lines[0]
+        if not reasoning:
+            reasoning = 'Based on document content analysis'
+        
+        return jsonify({
+            'suggestion': suggestion,
+            'reasoning': reasoning,
+            'tree_preview': tree_text[:500]  # For debugging
+        })
+        
+    except Exception as e:
+        app.logger.error(f'AI suggestion failed: {e}')
+        return jsonify({'error': f'AI suggestion failed: {str(e)}'}), 500
+
+
+@app.route('/api/move-file', methods=['POST'])
+def move_file():
+    """Move a file to a new location within the vault.
+    
+    Expects JSON: {from_path: "old/path.md", to_folder: "New/Folder"}
+    Returns: {success: true, new_path: "New/Folder/filename.md"}
+    """
+    data = request.get_json()
+    if not data or 'from_path' not in data or 'to_folder' not in data:
+        return jsonify({'error': 'Missing from_path or to_folder'}), 400
+    
+    from_path = data['from_path']
+    to_folder = data['to_folder']
+    
+    # Security checks
+    from_full = os.path.normpath(os.path.join(VAULT_PATH, from_path))
+    if not from_full.startswith(os.path.normpath(VAULT_PATH)):
+        return jsonify({'error': 'Invalid from_path'}), 403
+    
+    to_folder_full = os.path.normpath(os.path.join(VAULT_PATH, to_folder))
+    if not to_folder_full.startswith(os.path.normpath(VAULT_PATH)):
+        return jsonify({'error': 'Invalid to_folder'}), 403
+    
+    # Get filename
+    filename = os.path.basename(from_path)
+    
+    # Build destination path
+    new_full_path = os.path.join(to_folder_full, filename)
+    new_rel_path = os.path.relpath(new_full_path, VAULT_PATH)
+    
+    # Check if destination already exists
+    if os.path.exists(new_full_path):
+        # Append number to filename
+        name, ext = os.path.splitext(filename)
+        counter = 1
+        while os.path.exists(new_full_path):
+            new_filename = f"{name} ({counter}){ext}"
+            new_full_path = os.path.join(to_folder_full, new_filename)
+            new_rel_path = os.path.relpath(new_full_path, VAULT_PATH)
+            counter += 1
+    
+    try:
+        # Ensure destination directory exists
+        os.makedirs(to_folder_full, exist_ok=True)
+        
+        # Move the file
+        import shutil
+        shutil.move(from_full, new_full_path)
+        
+        return jsonify({
+            'success': True,
+            'new_path': new_rel_path,
+            'filename': os.path.basename(new_full_path)
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to move file: {str(e)}'}), 500
+
+
 @app.route('/api/restart', methods=['POST'])
 def restart_server():
     """Graceful restart - terminates this process.

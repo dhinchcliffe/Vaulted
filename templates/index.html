@@ -25,7 +25,8 @@
             <div class="toolbar">
                 <span id="currentFile">Select a file</span>
                 <div class="toolbar-actions">
-                    <button id="addWebBtn" class="btn btn-primary" title="Add web page by URL">+ Web</button>
+                    <button id="addWebBtn" class="btn btn-primary" title="Add web page by URL (Cmd+Shift+U)">+ Web <span class="shortcut-hint">⌘⇧U</span></button>
+                    <button id="autoFileBtn" class="btn btn-secondary" title="Auto-file this document (Cmd+Shift+F)">🗂️ Auto-File <span class="shortcut-hint">⌘⇧F</span></button>
                     <button id="editBtn" class="btn" style="display:none;">Edit</button>
                     <button id="previewBtn" class="btn" style="display:none;">Preview</button>
                     <span id="saveStatus" class="save-status"></span>
@@ -34,6 +35,37 @@
             <div class="editor-container">
                 <div id="preview" class="preview"></div>
                 <textarea id="editor" class="editor" style="display:none;"></textarea>
+            </div>
+            
+            <!-- Auto-File Modal -->
+            <div id="autoFileModal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>🗂️ Auto-File Suggestion</h3>
+                        <button class="modal-close" onclick="closeAutoFileModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="autoFileLoading" class="modal-loading">
+                            <div class="spinner"></div>
+                            <p>Analyzing document...</p>
+                        </div>
+                        <div id="autoFileResult" class="modal-result" style="display:none;">
+                            <div class="suggestion-box">
+                                <label>Suggested Location:</label>
+                                <div id="autoFileSuggestion" class="suggestion-path"></div>
+                                <div id="autoFileReasoning" class="suggestion-reasoning"></div>
+                            </div>
+                            <div class="modal-actions">
+                                <button id="confirmFileBtn" class="btn btn-primary">📁 File Here</button>
+                                <button onclick="closeAutoFileModal()" class="btn">Cancel</button>
+                            </div>
+                        </div>
+                        <div id="autoFileError" class="modal-error" style="display:none;">
+                            <p id="autoFileErrorMsg"></p>
+                            <button onclick="closeAutoFileModal()" class="btn">Close</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>

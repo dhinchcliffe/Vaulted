@@ -360,6 +360,26 @@ function setupEventListeners() {
         addWebBtn.addEventListener('click', addWebPage);
     }
     
+    // Global keyboard shortcuts (not just in editor)
+    document.addEventListener('keydown', (e) => {
+        // Cmd/Ctrl + Shift + U for Add Web Page
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'u') {
+            e.preventDefault();
+            addWebPage();
+        }
+        // Cmd/Ctrl + Shift + F for Auto-File
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+            e.preventDefault();
+            autoFileDocument();
+        }
+    });
+    
+    // Auto-File button
+    const autoFileBtn = document.getElementById('autoFileBtn');
+    if (autoFileBtn) {
+        autoFileBtn.addEventListener('click', autoFileDocument);
+    }
+    
     // Edit/Preview buttons
     editBtn.addEventListener('click', () => {
         isEditing = true;
@@ -449,6 +469,134 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// Auto-File Modal Functions
+function openAutoFileModal() {
+    const modal = document.getElementById('autoFileModal');
+    const loading = document.getElementById('autoFileLoading');
+    const result = document.getElementById('autoFileResult');
+    const error = document.getElementById('autoFileError');
+    
+    modal.style.display = 'flex';
+    loading.style.display = 'block';
+    result.style.display = 'none';
+    error.style.display = 'none';
+}
+
+function closeAutoFileModal() {
+    const modal = document.getElementById('autoFileModal');
+    modal.style.display = 'none';
+}
+
+function showAutoFileResult(suggestion, reasoning) {
+    const loading = document.getElementById('autoFileLoading');
+    const result = document.getElementById('autoFileResult');
+    const suggestionEl = document.getElementById('autoFileSuggestion');
+    const reasoningEl = document.getElementById('autoFileReasoning');
+    const confirmBtn = document.getElementById('confirmFileBtn');
+    
+    loading.style.display = 'none';
+    result.style.display = 'block';
+    
+    suggestionEl.textContent = suggestion;
+    reasoningEl.textContent = reasoning;
+    
+    // Setup confirm button
+    confirmBtn.onclick = () => confirmAutoFile(suggestion);
+}
+
+function showAutoFileError(message) {
+    const loading = document.getElementById('autoFileLoading');
+    const error = document.getElementById('autoFileError');
+    const errorMsg = document.getElementById('autoFileErrorMsg');
+    
+    loading.style.display = 'none';
+    error.style.display = 'block';
+    errorMsg.textContent = message;
+}
+
+let pendingAutoFileSuggestion = null;
+
+async function autoFileDocument() {
+    if (!currentFile) {
+        alert('No file is currently open');
+        return;
+    }
+    
+    openAutoFileModal();
+    pendingAutoFileSuggestion = null;
+    
+    try {
+        const response = await fetch('/api/suggest-file-location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                path: currentFile,
+                content: editor.value
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            showAutoFileError(data.error);
+        } else {
+            pendingAutoFileSuggestion = data.suggestion;
+            showAutoFileResult(data.suggestion, data.reasoning);
+        }
+    } catch (error) {
+        console.error('Auto-file failed:', error);
+        showAutoFileError('Failed to get suggestion. Check console for details.');
+    }
+}
+
+async function confirmAutoFile(targetFolder) {
+    if (!currentFile || !targetFolder) return;
+    
+    const confirmBtn = document.getElementById('confirmFileBtn');
+    confirmBtn.textContent = 'Moving...';
+    confirmBtn.disabled = true;
+    
+    try {
+        const response = await fetch('/api/move-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                from_path: currentFile,
+                to_folder: targetFolder
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            closeAutoFileModal();
+            // Refresh tree and load file at new location
+            await loadFileTree();
+            await loadFile(data.new_path);
+            // Show success
+            saveStatus.textContent = `Moved to ${targetFolder}`;
+            saveStatus.className = 'save-status saved';
+            setTimeout(() => { saveStatus.textContent = ''; }, 3000);
+        } else {
+            showAutoFileError(data.error || 'Failed to move file');
+        }
+    } catch (error) {
+        console.error('Move failed:', error);
+        showAutoFileError('Failed to move file. Check console for details.');
+    } finally {
+        confirmBtn.textContent = '📁 File Here';
+        confirmBtn.disabled = false;
+    }
+}
+
+// Close modal on backdrop click
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('autoFileModal');
+    if (e.target === modal) {
+        closeAutoFileModal();
+    }
+});
 
 // Start
 init();
