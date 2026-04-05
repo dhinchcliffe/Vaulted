@@ -603,7 +603,7 @@ def compress_tree_for_ai(path, relative_to=None, level=0):
     if relative_to is None:
         relative_to = path
     
-    if level > 4:  # Limit depth to 4 levels
+    if level > 5:  # Limit depth to 5 levels
         return []
     
     result = []
@@ -729,6 +729,7 @@ IMPORTANT:
 - Only suggest "ReadItLater Inbox" as a last resort for uncategorized content
 - HISTORY RULE: Content about events/people/civilizations before 1500 AD should go under "Personal Research/Ancient History" (create this path if it doesn't exist)
 - Be liberal in accepting existing folders — avoid creating overly specific new folders when a broader existing one works
+- When multiple existing folders could fit, prefer the MORE SPECIFIC/DEEPER path (e.g., "Personal Research/Sailing" over just "Sailing")
 
 Respond in this exact format:
 SUGGESTION: Folder/Subfolder
@@ -808,7 +809,7 @@ def move_file():
         return jsonify({'error': 'Missing from_path or to_folder'}), 400
     
     from_path = data['from_path']
-    to_folder = data['to_folder']
+    to_folder = data['to_folder'].lstrip('/')
     
     # Security checks
     from_full = os.path.normpath(os.path.join(VAULT_PATH, from_path))
