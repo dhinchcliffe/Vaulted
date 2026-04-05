@@ -506,3 +506,27 @@ body {
     color: #f48771;
     margin-bottom: 16px;
 }
+
+/* Context Menu */
+.context-menu {
+    position: fixed;
+    background: #2d2d2d;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    padding: 4px 0;
+    min-width: 120px;
+    z-index: 1001;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.context-menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #ccc;
+}
+
+.context-menu-item:hover {
+    background: #0e639c;
+    color: #fff;
+}

@@ -812,33 +812,33 @@ REASONING: Brief explanation of why this location fits"""
 @app.route('/api/move-file', methods=['POST'])
 def move_file():
     """Move a file to a new location within the vault.
-    
+
     Expects JSON: {from_path: "old/path.md", to_folder: "New/Folder"}
     Returns: {success: true, new_path: "New/Folder/filename.md"}
     """
     data = request.get_json()
     if not data or 'from_path' not in data or 'to_folder' not in data:
         return jsonify({'error': 'Missing from_path or to_folder'}), 400
-    
+
     from_path = data['from_path']
     to_folder = data['to_folder'].lstrip('/')
-    
+
     # Security checks
     from_full = os.path.normpath(os.path.join(VAULT_PATH, from_path))
     if not from_full.startswith(os.path.normpath(VAULT_PATH)):
         return jsonify({'error': 'Invalid from_path'}), 403
-    
+
     to_folder_full = os.path.normpath(os.path.join(VAULT_PATH, to_folder))
     if not to_folder_full.startswith(os.path.normpath(VAULT_PATH)):
         return jsonify({'error': 'Invalid to_folder'}), 403
-    
+
     # Get filename
     filename = os.path.basename(from_path)
-    
+
     # Build destination path
     new_full_path = os.path.join(to_folder_full, filename)
     new_rel_path = os.path.relpath(new_full_path, VAULT_PATH)
-    
+
     # Check if destination already exists
     if os.path.exists(new_full_path):
         # Append number to filename
@@ -849,15 +849,15 @@ def move_file():
             new_full_path = os.path.join(to_folder_full, new_filename)
             new_rel_path = os.path.relpath(new_full_path, VAULT_PATH)
             counter += 1
-    
+
     try:
         # Ensure destination directory exists
         os.makedirs(to_folder_full, exist_ok=True)
-        
+
         # Move the file
         import shutil
         shutil.move(from_full, new_full_path)
-        
+
         return jsonify({
             'success': True,
             'new_path': new_rel_path,
@@ -865,6 +865,59 @@ def move_file():
         })
     except Exception as e:
         return jsonify({'error': f'Failed to move file: {str(e)}'}), 500
+
+
+@app.route('/api/rename', methods=['POST'])
+def rename_item():
+    """Rename a file or directory within the vault.
+
+    Expects JSON: {path: "old/path.md", new_name: "newname.md"}
+    Returns: {success: true, new_path: "old/newname.md"}
+    """
+    data = request.get_json()
+    if not data or 'path' not in data or 'new_name' not in data:
+        return jsonify({'error': 'Missing path or new_name'}), 400
+
+    path = data['path']
+    new_name = data['new_name'].lstrip('/')
+
+    # Security checks
+    full_path = os.path.normpath(os.path.join(VAULT_PATH, path))
+    if not full_path.startswith(os.path.normpath(VAULT_PATH)):
+        return jsonify({'error': 'Invalid path'}), 403
+
+    # Check for path traversal in new_name
+    if '/' in new_name or '\\' in new_name or '..' in new_name:
+        return jsonify({'error': 'New name cannot contain path separators'}), 400
+
+    # Build new path (same parent directory)
+    parent_dir = os.path.dirname(full_path)
+    new_full_path = os.path.join(parent_dir, new_name)
+    new_rel_path = os.path.relpath(new_full_path, VAULT_PATH)
+
+    # Security check on new path
+    if not new_full_path.startswith(os.path.normpath(VAULT_PATH)):
+        return jsonify({'error': 'Invalid new name'}), 403
+
+    # Check if source exists
+    if not os.path.exists(full_path):
+        return jsonify({'error': 'Source does not exist'}), 404
+
+    # Check if destination already exists
+    if os.path.exists(new_full_path):
+        return jsonify({'error': 'A file or folder with that name already exists'}), 409
+
+    try:
+        import shutil
+        shutil.move(full_path, new_full_path)
+
+        return jsonify({
+            'success': True,
+            'new_path': new_rel_path,
+            'new_name': new_name
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to rename: {str(e)}'}), 500
 
 
 @app.route('/api/restart', methods=['POST'])

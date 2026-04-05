@@ -102,12 +102,14 @@ function renderTree(items, container = fileTree, level = 0, savedExpanded = null
                 e.stopPropagation();
                 toggleDirectory(div, item);
             });
+            setupTreeItemContextMenu(div, item.path, 'directory');
         } else {
             div.innerHTML = `
                 <span class="icon">📝</span>
                 <span>${escapeHtml(item.name)}</span>
             `;
             div.addEventListener('click', () => loadFile(item.path));
+            setupTreeItemContextMenu(div, item.path, 'file');
         }
         
         container.appendChild(div);
@@ -615,6 +617,11 @@ document.addEventListener('click', (e) => {
     if (e.target === modal) {
         closeAutoFileModal();
     }
+    // Close context menu when clicking elsewhere
+    const contextMenu = document.getElementById('contextMenu');
+    if (contextMenu && !contextMenu.contains(e.target)) {
+        contextMenu.style.display = 'none';
+    }
 });
 
 // Reveal current file in tree view
@@ -656,6 +663,133 @@ function revealCurrentFileInTree() {
         }, 800);
     }
 }
+
+// Context menu state
+let contextMenuTarget = null;
+
+// Show context menu
+function showContextMenu(e, path, type) {
+    e.preventDefault();
+    e.stopPropagation();
+    contextMenuTarget = { path, type };
+
+    const menu = document.getElementById('contextMenu');
+    menu.style.display = 'block';
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+
+    // Ensure menu stays within viewport
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        menu.style.left = `${e.clientX - rect.width}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+        menu.style.top = `${e.clientY - rect.height}px`;
+    }
+}
+
+// Setup context menu on tree items
+function setupTreeItemContextMenu(element, path, type) {
+    element.addEventListener('contextmenu', (e) => showContextMenu(e, path, type));
+}
+
+// Rename modal functions
+function openRenameModal() {
+    const modal = document.getElementById('renameModal');
+    const input = document.getElementById('renameInput');
+    const menu = document.getElementById('contextMenu');
+
+    menu.style.display = 'none';
+    modal.style.display = 'flex';
+
+    // Set current name as default
+    const parts = contextMenuTarget.path.split('/');
+    input.value = parts[parts.length - 1];
+    input.focus();
+    input.select();
+}
+
+function closeRenameModal() {
+    const modal = document.getElementById('renameModal');
+    modal.style.display = 'none';
+    contextMenuTarget = null;
+}
+
+async function confirmRename() {
+    if (!contextMenuTarget) return;
+
+    const input = document.getElementById('renameInput');
+    const newName = input.value.trim();
+    if (!newName || newName === contextMenuTarget.path.split('/').pop()) {
+        closeRenameModal();
+        return;
+    }
+
+    const btn = document.getElementById('confirmRenameBtn');
+    btn.textContent = 'Renaming...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/rename', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                path: contextMenuTarget.path,
+                new_name: newName
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            closeRenameModal();
+            // Refresh tree
+            await loadFileTree();
+            // If renamed file was open, update currentFile and reload
+            if (currentFile === contextMenuTarget.path) {
+                currentFile = data.new_path;
+                localStorage.setItem('vaulted_lastFile', currentFile);
+                currentFileLabel.textContent = currentFile;
+            }
+            saveStatus.textContent = 'Renamed';
+            saveStatus.className = 'save-status saved';
+            setTimeout(() => { saveStatus.textContent = ''; }, 3000);
+        } else {
+            alert('Error: ' + (data.error || 'Failed to rename'));
+        }
+    } catch (error) {
+        console.error('Rename failed:', error);
+        alert('Error: Failed to rename. Check console for details.');
+    } finally {
+        btn.textContent = 'Rename';
+        btn.disabled = false;
+    }
+}
+
+// Setup rename context menu handler
+document.addEventListener('DOMContentLoaded', () => {
+    const renameItem = document.getElementById('contextRename');
+    if (renameItem) {
+        renameItem.addEventListener('click', openRenameModal);
+    }
+
+    const confirmBtn = document.getElementById('confirmRenameBtn');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', confirmRename);
+    }
+
+    const renameInput = document.getElementById('renameInput');
+    if (renameInput) {
+        renameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmRename();
+            } else if (e.key === 'Escape') {
+                closeRenameModal();
+            }
+        });
+    }
+});
 
 // Start
 init();
