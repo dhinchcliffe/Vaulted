@@ -513,6 +513,15 @@ function showAutoFileResult(suggestion, reasoning) {
             confirmAutoFile(editedLocation);
         }
     };
+
+    // Allow Enter key to trigger filing
+    suggestionInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            confirmBtn.click();
+        }
+    };
+    suggestionInput.focus();
 }
 
 function showAutoFileError(message) {
