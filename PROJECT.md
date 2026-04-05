@@ -102,7 +102,7 @@ vaulted/
 
 ## Known Issues / Limitations
 1. **Sparse sync** - Files must be downloaded before editing (Dropbox limitation)
-2. **No image support** - Markdown images not handled (would need file serving)
+2. ~~No image support~~ - Fixed in v0.9.1
 3. **No wiki-links** - Obsidian [[links]] not specially handled
 4. **Single vault** - Hardcoded to one vault path
 
@@ -115,6 +115,22 @@ vaulted/
 - [ ] Multiple vault support
 
 ## Version History
+- **v0.10.1** (2026-04-05) - UI polish for shortcuts
+  - Improved shortcut hint visibility (lighter, bolder, more opaque)
+  - Button layout adjusted to keep hints on same line
+  - Added `white-space: nowrap` to prevent wrapping
+
+- **v0.10.0** (2026-04-05) - Keyboard shortcuts and Auto-File AI
+  - **Add Web Page shortcut:** `Cmd+Shift+U` with visual hint (⌘⇧U)
+  - **Auto-File feature:** AI-powered document organization
+    - Button: "🗂️ Auto-File" with shortcut `Cmd+Shift+F` (⌘⇧F)
+    - Uses `gpt-4o-mini` for cost efficiency (~$0.00007/suggestion)
+    - Compressed tree context (~450 tokens per request)
+    - Modal UI: shows suggestion + reasoning, "File Here" or Cancel
+    - Backend: `/api/suggest-file-location`, `/api/move-file`
+  - Tree compression algorithm for AI context (folders + counts, not full file list)
+  - Content truncated to 800 chars to minimize tokens
+
 - **v0.9.1** (2026-04-04) - Image rendering support
   - Added `/api/attachment/<path>` endpoint for serving images
   - Custom marked renderer to rewrite image paths
