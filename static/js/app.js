@@ -77,6 +77,9 @@ function renderTree(items, container = fileTree, level = 0) {
         container.innerHTML = '';
     }
     
+    // Get saved expanded state (only at root level)
+    const savedExpanded = level === 0 ? getSavedTreeState() : null;
+    
     items.forEach(item => {
         const div = document.createElement('div');
         div.className = `tree-item ${item.type}`;
@@ -84,7 +87,9 @@ function renderTree(items, container = fileTree, level = 0) {
         div.dataset.path = item.path;
         
         if (item.type === 'directory') {
-            div.classList.add('expanded');
+            // Check if we have saved state for this directory
+            const isExpanded = savedExpanded ? savedExpanded.includes(item.path) : true;
+            div.classList.add(isExpanded ? 'expanded' : 'collapsed');
             div.innerHTML = `
                 <span class="icon icon-folder"></span>
                 <span>${escapeHtml(item.name)}</span>
@@ -106,6 +111,10 @@ function renderTree(items, container = fileTree, level = 0) {
         if (item.type === 'directory' && item.children) {
             const childrenContainer = document.createElement('div');
             childrenContainer.className = 'tree-children';
+            // Hide children if directory is collapsed
+            if (div.classList.contains('collapsed')) {
+                childrenContainer.style.display = 'none';
+            }
             renderTree(item.children, childrenContainer, level + 1);
             container.appendChild(childrenContainer);
         }
@@ -119,6 +128,26 @@ function toggleDirectory(element, item) {
     const childrenContainer = element.nextElementSibling;
     if (childrenContainer) {
         childrenContainer.style.display = element.classList.contains('collapsed') ? 'none' : 'block';
+    }
+    // Save tree state after toggle
+    saveTreeState();
+}
+
+// Save expanded/collapsed state of all directories to localStorage
+function saveTreeState() {
+    const expandedPaths = [];
+    document.querySelectorAll('.tree-item.directory.expanded').forEach(el => {
+        expandedPaths.push(el.dataset.path);
+    });
+    localStorage.setItem('vaulted_expandedPaths', JSON.stringify(expandedPaths));
+}
+
+// Get saved tree state from localStorage
+function getSavedTreeState() {
+    try {
+        return JSON.parse(localStorage.getItem('vaulted_expandedPaths') || '[]');
+    } catch (e) {
+        return [];
     }
 }
 

@@ -2,6 +2,13 @@
 
 ## 2026-04-05
 
+### Added
+- **Persist tree expansion state**: Folder open/closed state is now saved to localStorage
+  - Automatically saves when you expand/collapse folders
+  - Restores same state on next visit
+  - New folders (not in saved state) default to expanded
+  - Per-client storage (each browser/device has its own state)
+
 ### Fixed
 - **Wiki-link images try multiple locations**: `![[image.png]]` now finds images in:
   1. Explicit path (if specified: `![[folder/image.png]]`)
