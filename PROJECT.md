@@ -115,7 +115,23 @@ vaulted/
 - [ ] Multiple vault support
 
 ## Version History
-- **v0.10.8** (2026-04-05) - LAST KNOWN GOOD - Infobox image preservation
+- **v0.10.12** (2026-04-05) - LAST KNOWN GOOD - Complete rename + Wikipedia links
+  - Right-click rename for files and directories in tree
+  - Renamed item is highlighted and scrolled into view after operation
+  - Preserve Wikipedia links in fetched pages (removed strip=['a'])
+
+- **v0.10.11** (2026-04-05) - Fix rename error handling
+  - Store paths before modal closes to prevent null reference error
+
+- **v0.10.10** (2026-04-05) - Highlight renamed items
+  - After rename, tree expands parent dirs and highlights the renamed item
+
+- **v0.10.9** (2026-04-05) - Right-click rename feature
+  - Context menu on tree nodes (right-click)
+  - Rename files and directories while preserving parent path
+  - Backend /api/rename endpoint with security checks
+
+- **v0.10.8** (2026-04-05) - Infobox image preservation
   - Extract infobox images before markdown conversion (markdownify strips images in tables)
   - Images prepended to content so Wikipedia infobox photos are preserved
 
