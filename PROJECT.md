@@ -115,6 +115,37 @@ vaulted/
 - [ ] Multiple vault support
 
 ## Version History
+- **v0.10.8** (2026-04-05) - LAST KNOWN GOOD - Infobox image preservation
+  - Extract infobox images before markdown conversion (markdownify strips images in tables)
+  - Images prepended to content so Wikipedia infobox photos are preserved
+
+- **v0.10.7** (2026-04-05) - Wikipedia URL encoding fix
+  - Decode URL-encoded characters (like `%27` apostrophe) in Wikipedia page titles
+  - Fixes pages like "Lorenzo_de%27_Medici" that previously failed
+
+- **v0.10.6** (2026-04-05) - Enter key in auto-file dialog
+  - Press Enter in the location input field to trigger "File Here" button
+  - Input auto-focused when suggestion appears
+
+- **v0.10.5** (2026-04-05) - Tree depth + path preference + slash fix
+  - Tree depth increased from 4 to 5 levels for AI context
+  - Prompt prefers deeper/more specific paths (e.g., "Personal Research/Sailing" over "Sailing")
+  - Strip leading slashes from user input in move_file to fix "/Path" errors
+
+- **v0.10.4** (2026-04-05) - Ancient History rule
+  - Auto-file prompt: pre-1500 AD content → "Personal Research/Ancient History"
+  - Prompt encourages creating new topical categories instead of defaulting to Inbox
+
+- **v0.10.3** (2026-04-05) - Better auto-file categorization
+  - Prompt changed to suggest NEW categories when existing folders don't fit
+  - Removed "default to ReadItLater Inbox" instruction
+  - Added "be liberal in accepting existing folders" guidance
+
+- **v0.10.2** (2026-04-05) - Editable auto-file + reveal in tree
+  - Auto-file location is now an editable text input
+  - Create custom folders by typing new paths (directories auto-created)
+  - Click file path in toolbar to reveal location in tree (expands folders, scrolls to file)
+
 - **v0.10.1** (2026-04-05) - UI polish for shortcuts
   - Improved shortcut hint visibility (lighter, bolder, more opaque)
   - Button layout adjusted to keep hints on same line
