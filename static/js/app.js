@@ -777,17 +777,20 @@ async function confirmRename() {
         const data = await response.json();
 
         if (data.success) {
+            // Store paths before closing modal clears them
+            const oldPath = contextMenuTarget.path;
+            const newPath = data.new_path;
             closeRenameModal();
             // Refresh tree
             await loadFileTree();
             // If renamed file was open, update currentFile and reload
-            if (currentFile === contextMenuTarget.path) {
-                currentFile = data.new_path;
+            if (currentFile === oldPath) {
+                currentFile = newPath;
                 localStorage.setItem('vaulted_lastFile', currentFile);
                 currentFileLabel.textContent = currentFile;
             }
             // Highlight and scroll to the renamed item
-            highlightTreeItem(data.new_path);
+            highlightTreeItem(newPath);
             saveStatus.textContent = 'Renamed';
             saveStatus.className = 'save-status saved';
             setTimeout(() => { saveStatus.textContent = ''; }, 3000);
