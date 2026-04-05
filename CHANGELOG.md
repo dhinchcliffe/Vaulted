@@ -9,12 +9,24 @@
   - New folders (not in saved state) default to expanded
   - Per-client storage (each browser/device has its own state)
 
+- **`/api/restart` endpoint**: Graceful server restart for code updates
+  - POST to `/api/restart` to trigger shutdown
+  - LaunchAgent auto-restarts within 10 seconds with latest code
+  - CLI tool: `restart-app.sh vaulted`
+  - Supported apps tracked in endpoint docstring
+
+- **Wikipedia images support**: Web fetch now preserves images
+  - Uses MediaWiki API to get HTML content
+  - Converts to Markdown with `markdownify` (preserves images)
+  - Images included as `![](url)` markdown
+  - Lists all page images at bottom of article
+
 ### Changed
 - **Improved web page fetching with specialized extractors**:
-  - **Wikipedia pages**: Uses `wikipedia` library for clean, structured content
+  - **Wikipedia pages**: Uses MediaWiki API for full HTML content
     - No edit buttons, navigation, or language links
     - Clean text with proper section headers
-    - Images not included (text-only extraction)
+    - Images preserved and converted to markdown
   - **General sites**: Uses `markdownify` library for better HTML-to-Markdown conversion
     - Better handling of article content
     - Cleaner markdown output

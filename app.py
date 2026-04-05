@@ -261,46 +261,100 @@ class HTMLToMarkdown(HTMLParser):
 
 
 def fetch_wikipedia_page(url):
-    """Fetch a Wikipedia page using the wikipedia library for clean extraction."""
+    """Fetch a Wikipedia page with images using MediaWiki API.
+    
+    Uses the parse API to get HTML content, then converts to Markdown
+    preserving images and structure.
+    """
     try:
-        # Extract page title from URL
+        # Extract page title and language from URL
         # URL format: https://en.wikipedia.org/wiki/Page_Title
         match = re.search(r'wikipedia\.org/wiki/([^#?]+)', url)
         if not match:
             return {'error': 'Could not extract Wikipedia page title from URL'}
         
-        page_title = match.group(1).replace('_', ' ')
-        
-        # Set language based on URL
+        page_title = match.group(1)
         lang_match = re.search(r'https://([a-z]+)\.wikipedia\.org', url)
-        if lang_match:
-            wikipedia.set_lang(lang_match.group(1))
+        lang = lang_match.group(1) if lang_match else 'en'
+        
+        # Build API URL
+        api_url = f"https://{lang}.wikipedia.org/w/api.php"
+        params = {
+            'action': 'parse',
+            'page': page_title,
+            'prop': 'text|images|displaytitle',
+            'format': 'json',
+            'redirects': 'true'
+        }
+        
+        # Fetch from API
+        headers = {'User-Agent': 'Vaulted/1.0 (research tool)'}
+        req = urllib.request.Request(
+            api_url + '?' + urllib.parse.urlencode(params),
+            headers=headers
+        )
+        
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = json.loads(response.read().decode('utf-8'))
+        
+        if 'error' in data:
+            return {'error': f"Wikipedia API error: {data['error'].get('info', 'Unknown error')}"}
+        
+        parse_data = data['parse']
+        title = re.sub(r'<[^>]+>', '', parse_data.get('displaytitle', parse_data['title']))
+        html_content = parse_data['text']['*']
+        images = parse_data.get('images', [])
+        
+        # Convert HTML to Markdown using markdownify
+        if MARKDOWNIFY_AVAILABLE:
+            # Clean up Wikipedia-specific elements before conversion
+            # Remove edit links, navigation, etc.
+            html_content = re.sub(r'<span class="mw-editsection[^"]*"[^>]*>.*?</span>', '', html_content, flags=re.DOTALL)
+            html_content = re.sub(r'<div class="mw-parser-output">\s*<div class="hatnote[^"]*"[^>]*>.*?</div>', '', html_content, flags=re.DOTALL)
+            
+            # Convert to markdown
+            content = markdownify.markdownify(
+                html_content,
+                heading_style='ATX',
+                strip=['a']  # Don't convert links to markdown, keep as is
+            )
+            
+            # Clean up Wikipedia image URLs - convert relative to absolute
+            content = re.sub(
+                r'!\[([^\]]*)\]\(/wiki/File:([^)]+)\)',
+                r'![\1](https://en.wikipedia.org/wiki/File:\2)',
+                content
+            )
+            
+            # Clean up excessive whitespace
+            content = re.sub(r'\n{3,}', '\n\n', content)
+            content = content.strip()
         else:
-            wikipedia.set_lang('en')
+            # Fallback: extract plain text
+            parser = HTMLToMarkdown()
+            parser.feed(html_content)
+            content = parser.get_markdown()
         
-        # Fetch the page
-        page = wikipedia.page(page_title, auto_suggest=False)
-        
-        # Get content and clean it up
-        content = page.content
-        
-        # Convert to markdown-style formatting
-        # The wikipedia library returns plain text with section headers marked by ==
-        # Convert == Section == to ## Section
-        content = re.sub(r'^== (.+?) ==$', r'## \1', content, flags=re.MULTILINE)
-        content = re.sub(r'^=== (.+?) ===$', r'### \1', content, flags=re.MULTILINE)
-        content = re.sub(r'^==== (.+?) ====$', r'#### \1', content, flags=re.MULTILINE)
+        # Add image list at the end if we have images
+        if images:
+            image_links = []
+            for img in images[:10]:  # Limit to first 10 images
+                if not img.startswith('File:OOjs'):  # Skip UI icons
+                    img_name = img.replace('File:', '')
+                    image_links.append(f"- [{img}](https://en.wikipedia.org/wiki/{img.replace(' ', '_')})")
+            
+            if image_links:
+                content += "\n\n## Images on this page\n\n"
+                content += "\n".join(image_links)
         
         return {
-            'title': page.title,
+            'title': title,
             'content': content,
             'url': url
         }
         
-    except wikipedia.exceptions.DisambiguationError as e:
-        return {'error': f'Ambiguous page title. Options: {", ".join(e.options[:5])}'}
-    except wikipedia.exceptions.PageError:
-        return {'error': 'Wikipedia page not found'}
+    except urllib.error.HTTPError as e:
+        return {'error': f'HTTP Error {e.code}: {e.reason}'}
     except Exception as e:
         return {'error': f'Failed to fetch Wikipedia page: {str(e)}'}
 
@@ -538,6 +592,39 @@ def get_attachment(filepath):
     
     # None found
     return jsonify({'error': 'File not found'}), 404
+
+
+@app.route('/api/restart', methods=['POST'])
+def restart_server():
+    """Graceful restart - terminates this process.
+    
+    When running under LaunchAgent, the agent will automatically restart
+    the process within 10 seconds, loading the latest code.
+    
+    Supported Apps:
+    - Vaulted (port 5006) ✓
+    
+    Planned:
+    - OpenClaw Tasks (port 5004)
+    - Siri API (port 5005)
+    """
+    import signal
+    import threading
+    
+    def delayed_shutdown():
+        import time
+        time.sleep(0.5)  # Give response time to send
+        os.kill(os.getpid(), signal.SIGTERM)
+    
+    # Start shutdown in background thread
+    threading.Thread(target=delayed_shutdown, daemon=True).start()
+    
+    return jsonify({
+        'status': 'restarting',
+        'message': 'Server shutting down. LaunchAgent will restart within 10 seconds.',
+        'pid': os.getpid()
+    })
+
 
 if __name__ == '__main__':
     print(f"Vaulted starting...")
