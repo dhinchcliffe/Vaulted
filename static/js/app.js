@@ -72,13 +72,12 @@ async function loadFileTree() {
 }
 
 // Render tree recursively
-function renderTree(items, container = fileTree, level = 0) {
+function renderTree(items, container = fileTree, level = 0, savedExpanded = null) {
     if (level === 0) {
         container.innerHTML = '';
+        // Get saved expanded state at root level and pass it down
+        savedExpanded = getSavedTreeState();
     }
-    
-    // Get saved expanded state (only at root level)
-    const savedExpanded = level === 0 ? getSavedTreeState() : null;
     
     items.forEach(item => {
         const div = document.createElement('div');
@@ -115,7 +114,7 @@ function renderTree(items, container = fileTree, level = 0) {
             if (div.classList.contains('collapsed')) {
                 childrenContainer.style.display = 'none';
             }
-            renderTree(item.children, childrenContainer, level + 1);
+            renderTree(item.children, childrenContainer, level + 1, savedExpanded);
             container.appendChild(childrenContainer);
         }
     });
