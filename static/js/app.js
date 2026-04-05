@@ -624,6 +624,41 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Highlight a tree item and scroll it into view
+function highlightTreeItem(path) {
+    // Expand parent directories
+    const pathParts = path.split('/');
+    pathParts.pop(); // Remove the item itself, keep parent dirs
+
+    let currentPath = '';
+    for (const part of pathParts) {
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
+        const dirEl = document.querySelector(`.tree-item.directory[data-path="${CSS.escape(currentPath)}"]`);
+        if (dirEl && dirEl.classList.contains('collapsed')) {
+            dirEl.classList.remove('collapsed');
+            dirEl.classList.add('expanded');
+            const childrenContainer = dirEl.nextElementSibling;
+            if (childrenContainer) {
+                childrenContainer.style.display = 'block';
+            }
+        }
+    }
+    saveTreeState();
+
+    // Find and highlight the item
+    const itemEl = document.querySelector(`.tree-item[data-path="${CSS.escape(path)}"]`);
+    if (itemEl) {
+        itemEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Flash highlight effect
+        itemEl.style.transition = 'background 0.3s';
+        const originalBg = itemEl.style.background;
+        itemEl.style.background = '#0e639c';
+        setTimeout(() => {
+            itemEl.style.background = originalBg;
+        }, 1500);
+    }
+}
+
 // Reveal current file in tree view
 function revealCurrentFileInTree() {
     if (!currentFile) return;
@@ -751,6 +786,8 @@ async function confirmRename() {
                 localStorage.setItem('vaulted_lastFile', currentFile);
                 currentFileLabel.textContent = currentFile;
             }
+            // Highlight and scroll to the renamed item
+            highlightTreeItem(data.new_path);
             saveStatus.textContent = 'Renamed';
             saveStatus.className = 'save-status saved';
             setTimeout(() => { saveStatus.textContent = ''; }, 3000);
