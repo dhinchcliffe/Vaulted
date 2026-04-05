@@ -187,18 +187,20 @@ function renderPreview(content) {
     const vaultBase = currentFile ? currentFile.substring(0, currentFile.lastIndexOf('/') + 1) : '';
     
     // Pre-process Obsidian wiki-link style images: ![[image.png]] -> <img> tag directly
-    // Wiki-links resolve from vault root, NOT from the file's directory
+    // Wiki-links try multiple locations: explicit path -> local folder -> vault root
+    const currentFileForContext = currentFile || '';
     let processedContent = content.replace(
         /!\[\[([^\]]+)\]\]/g,
         (match, imagePath) => {
             let fullPath = imagePath;
             if (!imagePath.match(/^https?:\/\//)) {
-                // Wiki-links are relative to vault root, not file location
-                // Remove leading ./ if present, but don't prepend vaultBase
+                // Remove leading ./ if present
                 if (imagePath.startsWith('./')) {
                     imagePath = imagePath.substring(2);
                 }
-                fullPath = '/api/attachment/' + encodeURIComponent(imagePath);
+                // Pass current file context so backend can try local folder
+                const fromParam = currentFileForContext ? `?from=${encodeURIComponent(currentFileForContext)}` : '';
+                fullPath = '/api/attachment/' + encodeURIComponent(imagePath) + fromParam;
             }
             return `<img src="${fullPath}" alt="${imagePath}" style="max-width: 100%;">`;
         }

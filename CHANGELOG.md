@@ -3,10 +3,13 @@
 ## 2026-04-05
 
 ### Fixed
-- **Wiki-link images now resolve from vault root**: `![[image.png]]` correctly finds images at vault root
-  - Previously incorrectly resolved relative to the markdown file's directory
-  - Now matches Obsidian's behavior: wiki-links are vault-root relative
-  - Standard markdown images `![](path)` still resolve relative to file location
+- **Wiki-link images try multiple locations**: `![[image.png]]` now finds images in:
+  1. Explicit path (if specified: `![[folder/image.png]]`)
+  2. Current file's directory (local folder)
+  3. Vault root
+  
+  Previously only resolved from vault root. Now matches Obsidian's flexible behavior.
+  Standard markdown images `![](path)` still resolve relative to file location only.
 
 ### Changed
 - **Folder-first sorting in file tree**: Directories now appear before files at every level

@@ -375,22 +375,49 @@ def fetch_web():
 
 @app.route('/api/attachment/<path:filepath>')
 def get_attachment(filepath):
-    """Serve image attachments from the vault."""
+    """Serve image attachments from the vault.
+    
+    Tries multiple locations in order:
+    1. Explicit path (if filepath contains '/')
+    2. Current file's directory (if context provided via ?from= param)
+    3. Vault root
+    """
     # Security: ensure the path stays within the vault
-    full_path = os.path.normpath(os.path.join(VAULT_PATH, filepath))
-    if not full_path.startswith(os.path.normpath(VAULT_PATH)):
-        return jsonify({'error': 'Invalid path'}), 403
+    def is_safe(path):
+        return os.path.normpath(path).startswith(os.path.normpath(VAULT_PATH))
     
-    # Get directory and filename
-    directory = os.path.dirname(full_path)
-    filename = os.path.basename(full_path)
+    # Get the referring file context (for local folder resolution)
+    from_file = request.args.get('from', '')
     
-    try:
-        return send_from_directory(directory, filename)
-    except FileNotFoundError:
-        return jsonify({'error': 'File not found'}), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    # Build list of paths to try
+    paths_to_try = []
+    
+    # 1. If path has explicit directory, try it as-is first
+    if '/' in filepath:
+        paths_to_try.append(os.path.join(VAULT_PATH, filepath))
+    
+    # 2. Try relative to the current file's directory
+    if from_file and '/' in from_file:
+        current_dir = os.path.dirname(os.path.join(VAULT_PATH, from_file))
+        paths_to_try.append(os.path.join(current_dir, filepath))
+    
+    # 3. Try vault root (always try this)
+    paths_to_try.append(os.path.join(VAULT_PATH, filepath))
+    
+    # Try each path in order
+    for full_path in paths_to_try:
+        if not is_safe(full_path):
+            continue
+        if os.path.isfile(full_path):
+            directory = os.path.dirname(full_path)
+            filename = os.path.basename(full_path)
+            try:
+                return send_from_directory(directory, filename)
+            except Exception:
+                continue
+    
+    # None found
+    return jsonify({'error': 'File not found'}), 404
 
 if __name__ == '__main__':
     print(f"Vaulted starting...")
