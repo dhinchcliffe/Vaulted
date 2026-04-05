@@ -723,11 +723,14 @@ DOCUMENT (first ~800 chars):
 
 Based on the document's content and the existing vault structure, suggest the best folder path to file this document.
 
+IMPORTANT:
+- Prefer existing folders when there's a clear topical match
+- If no existing folder fits well, suggest creating a NEW category that matches the document's subject (e.g., "Geography", "History", "Technology", etc.)
+- Only suggest "ReadItLater Inbox" as a last resort for uncategorized content
+
 Respond in this exact format:
 SUGGESTION: Folder/Subfolder
-REASONING: Brief explanation of why this location fits
-
-If unsure, suggest "ReadItLater Inbox" as the location."""
+REASONING: Brief explanation of why this location fits"""
     
     try:
         # Use OpenAI API with gpt-4o-mini for cost efficiency
