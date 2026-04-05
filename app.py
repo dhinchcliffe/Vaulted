@@ -273,7 +273,7 @@ def fetch_wikipedia_page(url):
         if not match:
             return {'error': 'Could not extract Wikipedia page title from URL'}
         
-        page_title = match.group(1)
+        page_title = urllib.parse.unquote(match.group(1))
         lang_match = re.search(r'https://([a-z]+)\.wikipedia\.org', url)
         lang = lang_match.group(1) if lang_match else 'en'
         
