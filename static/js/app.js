@@ -237,8 +237,12 @@ function renderPreview(content) {
     // Custom renderer for standard markdown images
     const renderer = new marked.Renderer();
     renderer.image = ({ href, title, text }) => {
+        // Handle protocol-relative URLs (//example.com/image.jpg -> https://example.com/image.jpg)
+        if (href && href.startsWith('//')) {
+            href = 'https:' + href;
+        }
         // If href is a relative path (not URL), rewrite it to use our attachment endpoint
-        if (href && !href.match(/^https?:\/\//)) {
+        else if (href && !href.match(/^https?:\/\//)) {
             let imagePath = href;
             if (imagePath.startsWith('./')) {
                 imagePath = imagePath.substring(2);

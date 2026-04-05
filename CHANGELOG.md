@@ -33,6 +33,9 @@
   - **Fallback**: Legacy parser still available if libraries not installed
 
 ### Fixed
+- **Protocol-relative image URLs**: Images with `//domain.com/path` now convert to `https://domain.com/path`
+  - Fixes Wikipedia images that use protocol-relative URLs
+  - All 4 image URL types now handled: wiki-links, relative paths, absolute paths, protocol-relative
 - **Filename format for saved web pages**: Now `Title - Date.md` instead of `Date - Title.md`
   - Easier to scan and find articles in ReadItLater Inbox
 - **Wiki-link images try multiple locations**: `![[image.png]]` now finds images in:
