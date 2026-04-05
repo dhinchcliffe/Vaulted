@@ -1,5 +1,14 @@
 # Vaulted Changelog
 
+## 2026-04-05
+
+### Changed
+- **Folder-first sorting in file tree**: Directories now appear before files at every level
+  - Root folders sorted alphabetically appear first
+  - Root files sorted alphabetically appear after all folders
+  - Same sorting applies recursively to all subdirectories
+  - Case-insensitive alphabetical sorting
+
 ## 2026-04-04
 
 ### Added

@@ -19,16 +19,21 @@ app = Flask(__name__)
 VAULT_PATH = os.path.expanduser("~/Dropbox/Apps/remotely-save/DPH Research")
 
 def get_file_tree(path, relative_to=None):
-    """Build a tree structure of the vault directory."""
+    """Build a tree structure of the vault directory.
+    
+    Directories are listed first (alphabetically), followed by files (alphabetically).
+    """
     if relative_to is None:
         relative_to = path
     
-    tree = []
+    dirs = []
+    files = []
+    
     try:
-        entries = sorted(os.listdir(path))
+        entries = os.listdir(path)
     except (OSError, PermissionError) as e:
         app.logger.warning(f"Could not list directory {path}: {e}")
-        return tree
+        return []
     
     for entry in entries:
         if entry.startswith('.'):
@@ -40,14 +45,14 @@ def get_file_tree(path, relative_to=None):
         try:
             if os.path.isdir(full_path):
                 children = get_file_tree(full_path, relative_to)
-                tree.append({
+                dirs.append({
                     'name': entry,
                     'path': rel_path,
                     'type': 'directory',
                     'children': children
                 })
             elif entry.endswith('.md'):
-                tree.append({
+                files.append({
                     'name': entry,
                     'path': rel_path,
                     'type': 'file'
@@ -57,7 +62,11 @@ def get_file_tree(path, relative_to=None):
             app.logger.debug(f"Skipping {full_path}: {e}")
             continue
     
-    return tree
+    # Sort directories and files alphabetically by name, then return dirs first
+    dirs.sort(key=lambda x: x['name'].lower())
+    files.sort(key=lambda x: x['name'].lower())
+    
+    return dirs + files
 
 def find_first_markdown(path):
     """Find the first accessible markdown file in the vault."""
