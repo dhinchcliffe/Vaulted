@@ -727,6 +727,8 @@ IMPORTANT:
 - Prefer existing folders when there's a clear topical match
 - If no existing folder fits well, suggest creating a NEW category that matches the document's subject (e.g., "Geography", "History", "Technology", etc.)
 - Only suggest "ReadItLater Inbox" as a last resort for uncategorized content
+- HISTORY RULE: Content about events/people/civilizations before 1500 AD should go under "Personal Research/Ancient History" (create this path if it doesn't exist)
+- Be liberal in accepting existing folders — avoid creating overly specific new folders when a broader existing one works
 
 Respond in this exact format:
 SUGGESTION: Folder/Subfolder
