@@ -39,7 +39,28 @@
             
             <!-- Context Menu -->
             <div id="contextMenu" class="context-menu" style="display:none;">
+                <div class="context-menu-item" id="contextAddPage" style="display:none;">+ Add Page</div>
                 <div class="context-menu-item" id="contextRename">Rename</div>
+            </div>
+
+            <!-- Add Page Modal -->
+            <div id="addPageModal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Add Page</h3>
+                        <button class="modal-close" onclick="closeAddPageModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="suggestion-box">
+                            <label for="addPageInput">Page name:</label>
+                            <input type="text" id="addPageInput" class="suggestion-path-input" placeholder="A blank page">
+                        </div>
+                        <div class="modal-actions">
+                            <button id="confirmAddPageBtn" class="btn btn-primary">Create Page</button>
+                            <button onclick="closeAddPageModal()" class="btn">Cancel</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Rename Modal -->

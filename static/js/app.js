@@ -221,6 +221,35 @@ function renderPreview(content) {
     // Get the base path for the current file (for standard markdown images)
     const vaultBase = currentFile ? currentFile.substring(0, currentFile.lastIndexOf('/') + 1) : '';
     
+    // Parse YAML frontmatter to extract source_url for external pages
+    let sourceUrl = null;
+    let sourceOrigin = null;
+    const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
+    if (frontmatterMatch) {
+        const sourceUrlMatch = frontmatterMatch[1].match(/^source_url:\s*(.+)$/m);
+        if (sourceUrlMatch) {
+            sourceUrl = sourceUrlMatch[1].trim();
+            try {
+                sourceOrigin = new URL(sourceUrl).origin;
+            } catch (e) {
+                // Invalid URL, ignore
+            }
+        }
+    }
+    
+    // Fallback: parse "Saved from" line for older pages without YAML frontmatter
+    if (!sourceOrigin) {
+        const savedFromMatch = content.match(/\*Saved from\s+(https?:\/\/[^\s]+)\s+on/i);
+        if (savedFromMatch) {
+            sourceUrl = savedFromMatch[1].trim();
+            try {
+                sourceOrigin = new URL(sourceUrl).origin;
+            } catch (e) {
+                // Invalid URL, ignore
+            }
+        }
+    }
+    
     // Pre-process Obsidian wiki-link style images: ![[image.png]] -> <img> tag directly
     // Wiki-links try multiple locations: explicit path -> local folder -> vault root
     const currentFileForContext = currentFile || '';
@@ -247,6 +276,10 @@ function renderPreview(content) {
         // Handle protocol-relative URLs (//example.com/image.jpg -> https://example.com/image.jpg)
         if (href && href.startsWith('//')) {
             href = 'https:' + href;
+        }
+        // Root-relative URLs (starting with /) - convert to absolute using source URL if available
+        else if (href && href.startsWith('/') && sourceOrigin) {
+            href = sourceOrigin + href;
         }
         // If href is a relative path (not URL), rewrite it to use our attachment endpoint
         else if (href && !href.match(/^https?:\/\//)) {
@@ -709,6 +742,15 @@ function showContextMenu(e, path, type) {
     contextMenuTarget = { path, type };
 
     const menu = document.getElementById('contextMenu');
+    const addPageItem = document.getElementById('contextAddPage');
+
+    // Show/hide Add Page based on type (only for directories)
+    if (type === 'directory') {
+        addPageItem.style.display = 'block';
+    } else {
+        addPageItem.style.display = 'none';
+    }
+
     menu.style.display = 'block';
     menu.style.left = `${e.clientX}px`;
     menu.style.top = `${e.clientY}px`;
@@ -806,11 +848,85 @@ async function confirmRename() {
     }
 }
 
+// Add Page modal functions
+function openAddPageModal() {
+    const modal = document.getElementById('addPageModal');
+    const input = document.getElementById('addPageInput');
+    const menu = document.getElementById('contextMenu');
+
+    menu.style.display = 'none';
+    modal.style.display = 'flex';
+
+    // Clear input and focus
+    input.value = '';
+    input.focus();
+}
+
+function closeAddPageModal() {
+    const modal = document.getElementById('addPageModal');
+    modal.style.display = 'none';
+    contextMenuTarget = null;
+}
+
+async function confirmAddPage() {
+    if (!contextMenuTarget || contextMenuTarget.type !== 'directory') return;
+
+    const input = document.getElementById('addPageInput');
+    const filename = input.value.trim();
+    if (!filename) {
+        closeAddPageModal();
+        return;
+    }
+
+    const btn = document.getElementById('confirmAddPageBtn');
+    btn.textContent = 'Creating...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/create-page', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                folder: contextMenuTarget.path,
+                filename: filename
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            closeAddPageModal();
+            // Refresh tree
+            await loadFileTree();
+            // Load the new file
+            await loadFile(data.path);
+            // Highlight in tree
+            highlightTreeItem(data.path);
+            saveStatus.textContent = 'Created: ' + data.filename;
+            saveStatus.className = 'save-status saved';
+            setTimeout(() => { saveStatus.textContent = ''; }, 3000);
+        } else {
+            alert('Error: ' + (data.error || 'Failed to create page'));
+        }
+    } catch (error) {
+        console.error('Create page failed:', error);
+        alert('Error: Failed to create page. Check console for details.');
+    } finally {
+        btn.textContent = 'Create Page';
+        btn.disabled = false;
+    }
+}
+
 // Setup rename context menu handler
 document.addEventListener('DOMContentLoaded', () => {
     const renameItem = document.getElementById('contextRename');
     if (renameItem) {
         renameItem.addEventListener('click', openRenameModal);
+    }
+
+    const addPageItem = document.getElementById('contextAddPage');
+    if (addPageItem) {
+        addPageItem.addEventListener('click', openAddPageModal);
     }
 
     const confirmBtn = document.getElementById('confirmRenameBtn');
@@ -826,6 +942,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 confirmRename();
             } else if (e.key === 'Escape') {
                 closeRenameModal();
+            }
+        });
+    }
+
+    const confirmAddPageBtn = document.getElementById('confirmAddPageBtn');
+    if (confirmAddPageBtn) {
+        confirmAddPageBtn.addEventListener('click', confirmAddPage);
+    }
+
+    const addPageInput = document.getElementById('addPageInput');
+    if (addPageInput) {
+        addPageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmAddPage();
+            } else if (e.key === 'Escape') {
+                closeAddPageModal();
             }
         });
     }

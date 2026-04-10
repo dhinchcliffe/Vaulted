@@ -384,8 +384,131 @@ def fetch_web_page(url):
     return fetch_web_page_legacy(url)
 
 
+def extract_twitter_handle_and_id(url):
+    """Extract Twitter/X handle and status ID from URL.
+    
+    Returns tuple (handle, status_id) or (None, None) if not a valid X/Twitter URL.
+    """
+    # Match patterns like:
+    # https://x.com/username/status/123456...
+    # https://twitter.com/username/status/123456...
+    patterns = [
+        r'(?:https?://)?(?:www\.)?(?:x\.com|twitter\.com)/([^/]+)/status/(\d+)',
+        r'(?:https?://)?(?:www\.)?(?:x\.com|twitter\.com)/([^/]+)/status/(\d+)',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, url, re.IGNORECASE)
+        if match:
+            return match.group(1), match.group(2)
+    
+    return None, None
+
+
+def fetch_x_post(url):
+    """Handle X/Twitter URLs specially since they block standard requests.
+    
+    X.com requires JavaScript to render content, so we can't fetch the actual post text
+    through standard HTTP requests. We try to extract metadata from the page's embedded
+    JSON data, and fall back to a reference entry if that fails.
+    """
+    handle, status_id = extract_twitter_handle_and_id(url)
+    
+    if not handle or not status_id:
+        return {'error': 'Could not parse X/Twitter URL'}
+    
+    # Try to fetch the page and extract metadata from __INITIAL_STATE__
+    try:
+        import requests
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+        }
+        
+        response = requests.get(url, headers=headers, timeout=30)
+        html = response.text
+        
+        # Try to extract __INITIAL_STATE__ JSON
+        match = re.search(r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});(?:window\.|</script>)', html, re.DOTALL)
+        if match:
+            data = json.loads(match.group(1))
+            
+            # Look for user info
+            user_name = handle
+            user_display_name = handle
+            if 'entities' in data and 'users' in data['entities']:
+                users = data['entities']['users'].get('entities', {})
+                # Find user by screen_name
+                for user_id, user in users.items():
+                    if user.get('screen_name', '').lower() == handle.lower():
+                        user_name = user.get('screen_name', handle)
+                        user_display_name = user.get('name', handle)
+                        break
+            
+            # Try to find tweet text in the HTML meta tags or JSON
+            tweet_text = None
+            
+            # Check if there's any tweet content in the entities
+            tweets = data.get('entities', {}).get('tweets', {}).get('entities', {})
+            for tweet_id, tweet in tweets.items():
+                if str(tweet_id) == str(status_id) or status_id in str(tweet_id):
+                    tweet_text = tweet.get('full_text') or tweet.get('text')
+                    break
+            
+            # If we found tweet text, use it
+            if tweet_text:
+                title = f"X Post by @{user_name}"
+                content = f"""**@{user_name}** ({user_display_name})
+
+{tweet_text}
+
+---
+**Post URL:** {url}
+**Post ID:** {status_id}
+*Note: Fetched from X.com metadata*
+"""
+                return {
+                    'title': title,
+                    'content': content,
+                    'url': url,
+                    'handle': user_name,
+                    'status_id': status_id
+                }
+    except Exception:
+        # If extraction fails, fall through to reference entry
+        pass
+    
+    # Fall back to reference entry
+    title = f"X Post by @{handle}"
+    
+    content = f"""**@{handle}**
+
+This is an X (Twitter) post.
+
+**Note:** X.com requires JavaScript to display content and blocks automated fetching. 
+To view the full post content, please open the link below in your browser.
+
+**Post URL:** {url}
+
+**Post ID:** {status_id}
+"""
+    
+    return {
+        'title': title,
+        'content': content,
+        'url': url,
+        'handle': handle,
+        'status_id': status_id
+    }
+
+
 def fetch_web_page_markdownify(url):
     """Fetch web page using markdownify library."""
+    # Check if this is an X/Twitter URL first
+    if 'x.com' in url or 'twitter.com' in url:
+        return fetch_x_post(url)
+    
     try:
         import requests
         from bs4 import BeautifulSoup
@@ -404,6 +527,18 @@ def fetch_web_page_markdownify(url):
         if soup.title:
             title = soup.title.get_text().strip()
         title = re.sub(r'[\\/:*?"<>|]', '', title)
+        
+        # Check if this is a JavaScript-required page (like X/Twitter error page)
+        noscript = soup.find('noscript')
+        if noscript and 'JavaScript' in str(noscript):
+            # Check if it's specifically an X/Twitter block
+            page_text = soup.get_text()
+            if 'x.com' in page_text or 'twitter.com' in page_text:
+                if 'JavaScript is not available' in page_text or 'JavaScript is disabled' in page_text:
+                    # Try to extract handle from URL and create reference
+                    handle, status_id = extract_twitter_handle_and_id(url)
+                    if handle:
+                        return fetch_x_post(url)
         
         # Try to find main content
         content_html = str(soup)
@@ -533,8 +668,12 @@ def fetch_web():
         inbox_path = f"{name} ({counter}){ext}"
         counter += 1
     
-    # Create markdown content
-    markdown_content = f"""[[ReadItLater]] [[Article]]
+    # Create markdown content with YAML frontmatter for source URL
+    markdown_content = f"""---
+source_url: {result['url']}
+---
+
+[[ReadItLater]] [[Article]]
 
 # [{result['title']}]({result['url']})
 
@@ -864,6 +1003,70 @@ def move_file():
         })
     except Exception as e:
         return jsonify({'error': f'Failed to move file: {str(e)}'}), 500
+
+
+@app.route('/api/create-page', methods=['POST'])
+def create_page():
+    """Create a new blank markdown page in a folder.
+
+    Expects JSON: {folder: "Folder/Path", filename: "page name.md"}
+    Returns: {success: true, path: "Folder/Path/page name.md"}
+    """
+    data = request.get_json()
+    if not data or 'folder' not in data or 'filename' not in data:
+        return jsonify({'error': 'Missing folder or filename'}), 400
+
+    folder = data['folder'].lstrip('/')
+    filename = data['filename'].lstrip('/')
+
+    # Security checks
+    folder_full = os.path.normpath(os.path.join(VAULT_PATH, folder))
+    if not folder_full.startswith(os.path.normpath(VAULT_PATH)):
+        return jsonify({'error': 'Invalid folder path'}), 403
+
+    # Ensure filename ends with .md
+    if not filename.endswith('.md'):
+        filename += '.md'
+
+    # Security check on filename (no path traversal)
+    if '/' in filename or '\\' in filename or '..' in filename:
+        return jsonify({'error': 'Filename cannot contain path separators'}), 400
+
+    # Build full path
+    full_path = os.path.join(folder_full, filename)
+
+    # Security check on final path
+    if not full_path.startswith(os.path.normpath(VAULT_PATH)):
+        return jsonify({'error': 'Invalid path'}), 403
+
+    # Check if file already exists
+    if os.path.exists(full_path):
+        return jsonify({'error': 'A file with that name already exists'}), 409
+
+    try:
+        # Ensure directory exists
+        os.makedirs(folder_full, exist_ok=True)
+
+        # Create blank markdown file with minimal frontmatter
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        content = f"""---
+created: {date_str}
+---
+
+# {filename.replace('.md', '')}
+
+"""
+        with open(full_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        rel_path = os.path.relpath(full_path, VAULT_PATH)
+        return jsonify({
+            'success': True,
+            'path': rel_path,
+            'filename': filename
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to create page: {str(e)}'}), 500
 
 
 @app.route('/api/rename', methods=['POST'])
