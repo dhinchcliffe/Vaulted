@@ -115,7 +115,12 @@ vaulted/
 - [ ] Multiple vault support
 
 ## Version History
-- **v0.10.12** (2026-04-05) - LAST KNOWN GOOD - Complete rename + Wikipedia links
+- **v0.10.13** (2026-04-10) - LAST KNOWN GOOD - Add 'Add Page' feature for folders
+  - Right-click any folder to create a new blank document
+  - Auto-sorts to top as 'A blank page.md'
+  - Modal with Enter/Escape keyboard shortcuts
+
+- **v0.10.12** (2026-04-05) - Complete rename + Wikipedia links
   - Right-click rename for files and directories in tree
   - Renamed item is highlighted and scrolled into view after operation
   - Preserve Wikipedia links in fetched pages (removed strip=['a'])

@@ -627,6 +627,99 @@ def fetch_web_page_legacy(url):
         return {'error': f'Failed to fetch page: {str(e)}'}
 
 
+def html_to_markdown(html_content):
+    """Convert HTML content to markdown using markdownify or fallback."""
+    if MARKDOWNIFY_AVAILABLE:
+        try:
+            content = markdownify.markdownify(html_content, heading_style='ATX', strip=['a'])
+            # Clean up excessive whitespace
+            content = re.sub(r'\n{3,}', '\n\n', content)
+            return content.strip()
+        except Exception:
+            pass
+    
+    # Fallback: simple text extraction
+    parser = HTMLToMarkdown()
+    parser.feed(html_content)
+    return parser.get_markdown()
+
+
+@app.route('/api/quick-paste', methods=['POST'])
+def quick_paste():
+    """Save clipboard content to ReadItLater inbox.
+    
+    Expects JSON: {content: "text or html", is_html: false}
+    Filename derived from first line (max 100 chars).
+    """
+    data = request.get_json()
+    if not data or 'content' not in data:
+        return jsonify({'error': 'No content provided'}), 400
+    
+    content = data['content']
+    is_html = data.get('is_html', False)
+    
+    if not content or not content.strip():
+        return jsonify({'error': 'Empty content'}), 400
+    
+    # Convert HTML to markdown if needed
+    if is_html:
+        markdown_content = html_to_markdown(content)
+    else:
+        markdown_content = content
+    
+    # Derive filename from first line (max 100 chars)
+    first_line = markdown_content.split('\n')[0].strip()
+    # Remove markdown heading markers
+    first_line = re.sub(r'^#+\s*', '', first_line)
+    # Clean up for filename
+    safe_title = first_line[:100] if first_line else 'Quick Paste'
+    safe_title = re.sub(r'[\\/:*?"<>|]', '', safe_title)
+    safe_title = re.sub(r'\s+', ' ', safe_title).strip()
+    
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    filename = f"{safe_title} - {date_str}.md"
+    
+    # ReadItLater inbox path
+    inbox_path = os.path.join(VAULT_PATH, 'ReadItLater Inbox', filename)
+    
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(inbox_path), exist_ok=True)
+    
+    # Check if file exists and append number if needed
+    counter = 1
+    original_inbox_path = inbox_path
+    while os.path.exists(inbox_path):
+        name, ext = os.path.splitext(original_inbox_path)
+        inbox_path = f"{name} ({counter}){ext}"
+        counter += 1
+    
+    # Create markdown content with YAML frontmatter
+    final_content = f"""---
+created: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+---
+
+[[ReadItLater]] [[Quick Paste]]
+
+{markdown_content}
+
+---
+*Pasted on {datetime.now().strftime('%Y-%m-%d %H:%M')}*
+"""
+    
+    try:
+        with open(inbox_path, 'w', encoding='utf-8') as f:
+            f.write(final_content)
+        
+        rel_path = os.path.relpath(inbox_path, VAULT_PATH)
+        return jsonify({
+            'success': True,
+            'path': rel_path,
+            'title': safe_title
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to save file: {str(e)}'}), 500
+
+
 @app.route('/api/fetch-web', methods=['POST'])
 def fetch_web():
     """Fetch a web page and save it to ReadItLater inbox."""

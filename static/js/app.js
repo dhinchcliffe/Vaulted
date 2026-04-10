@@ -394,14 +394,25 @@ function redo() {
 
 // Setup event listeners
 function setupEventListeners() {
+    // Quick Paste button
+    const quickPasteBtn = document.getElementById('quickPasteBtn');
+    if (quickPasteBtn) {
+        quickPasteBtn.addEventListener('click', quickPaste);
+    }
+
     // Add Web Page button
     const addWebBtn = document.getElementById('addWebBtn');
     if (addWebBtn) {
         addWebBtn.addEventListener('click', addWebPage);
     }
-    
+
     // Global keyboard shortcuts (not just in editor)
     document.addEventListener('keydown', (e) => {
+        // Cmd/Ctrl + Shift + V for Quick Paste
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
+            e.preventDefault();
+            quickPaste();
+        }
         // Cmd/Ctrl + Shift + U for Add Web Page
         if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'u') {
             e.preventDefault();
@@ -461,6 +472,106 @@ function setupEventListeners() {
             updateView();
         }
     });
+}
+
+// Quick Paste Modal Functions
+function openQuickPasteModal() {
+    const modal = document.getElementById('quickPasteModal');
+    const pasteArea = document.getElementById('quickPasteArea');
+
+    modal.style.display = 'flex';
+    pasteArea.innerHTML = '';
+    pasteArea.focus();
+
+    // Try to auto-paste from clipboard if API is available
+    if (navigator.clipboard && navigator.clipboard.read) {
+        navigator.clipboard.read().then(clipboardItems => {
+            for (const item of clipboardItems) {
+                if (item.types.includes('text/html')) {
+                    item.getType('text/html').then(blob => {
+                        blob.text().then(html => {
+                            pasteArea.innerHTML = html;
+                        });
+                    });
+                    return;
+                } else if (item.types.includes('text/plain')) {
+                    item.getType('text/plain').then(blob => {
+                        blob.text().then(text => {
+                            pasteArea.textContent = text;
+                        });
+                    });
+                    return;
+                }
+            }
+        }).catch(err => {
+            console.log('Auto-paste failed, waiting for manual paste:', err);
+        });
+    }
+}
+
+function closeQuickPasteModal() {
+    const modal = document.getElementById('quickPasteModal');
+    modal.style.display = 'none';
+}
+
+async function confirmQuickPaste() {
+    const pasteArea = document.getElementById('quickPasteArea');
+    const btn = document.getElementById('confirmQuickPasteBtn');
+
+    const htmlContent = pasteArea.innerHTML;
+    const textContent = pasteArea.textContent;
+
+    if (!textContent || !textContent.trim()) {
+        closeQuickPasteModal();
+        return;
+    }
+
+    btn.textContent = 'Creating...';
+    btn.disabled = true;
+
+    try {
+        // Check if there's actual HTML formatting or just plain text
+        const hasRealHtml = htmlContent !== textContent && htmlContent.includes('<');
+        await sendQuickPaste(hasRealHtml ? htmlContent : textContent, hasRealHtml);
+        closeQuickPasteModal();
+    } catch (error) {
+        console.error('Quick paste failed:', error);
+        alert('Error: Failed to paste. Check console for details.');
+    } finally {
+        btn.textContent = 'Create Page';
+        btn.disabled = false;
+    }
+}
+
+// Quick paste from clipboard
+async function quickPaste() {
+    openQuickPasteModal();
+}
+
+async function sendQuickPaste(content, isHtml) {
+    const response = await fetch('/api/quick-paste', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            content: content,
+            is_html: isHtml
+        })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+        // Refresh file tree to show new file
+        await loadFileTree();
+        // Load the new file
+        await loadFile(data.path);
+        // Show success
+        saveStatus.textContent = `Pasted: ${data.title}`;
+        saveStatus.className = 'save-status saved';
+        setTimeout(() => { saveStatus.textContent = ''; }, 3000);
+    } else {
+        alert('Error: ' + (data.error || 'Failed to paste'));
+    }
 }
 
 // Add web page by URL
@@ -646,9 +757,13 @@ async function confirmAutoFile(targetFolder) {
 
 // Close modal on backdrop click
 document.addEventListener('click', (e) => {
-    const modal = document.getElementById('autoFileModal');
-    if (e.target === modal) {
+    const autoFileModal = document.getElementById('autoFileModal');
+    if (e.target === autoFileModal) {
         closeAutoFileModal();
+    }
+    const quickPasteModal = document.getElementById('quickPasteModal');
+    if (e.target === quickPasteModal) {
+        closeQuickPasteModal();
     }
     // Close context menu when clicking elsewhere
     const contextMenu = document.getElementById('contextMenu');
@@ -960,6 +1075,31 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (e.key === 'Escape') {
                 closeAddPageModal();
             }
+        });
+    }
+
+    // Quick Paste modal handlers
+    const confirmQuickPasteBtn = document.getElementById('confirmQuickPasteBtn');
+    if (confirmQuickPasteBtn) {
+        confirmQuickPasteBtn.addEventListener('click', confirmQuickPaste);
+    }
+
+    const quickPasteArea = document.getElementById('quickPasteArea');
+    if (quickPasteArea) {
+        quickPasteArea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                confirmQuickPaste();
+            } else if (e.key === 'Escape') {
+                closeQuickPasteModal();
+            }
+        });
+        // Handle paste event to capture rich text
+        quickPasteArea.addEventListener('paste', (e) => {
+            // Let the default paste happen, then we'll read the HTML
+            setTimeout(() => {
+                // Content is now pasted, modal will use innerHTML
+            }, 0);
         });
     }
 });

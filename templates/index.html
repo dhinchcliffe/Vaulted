@@ -25,6 +25,7 @@
             <div class="toolbar">
                 <span id="currentFile">Select a file</span>
                 <div class="toolbar-actions">
+                    <button id="quickPasteBtn" class="btn btn-primary" title="Quick paste from clipboard (Cmd+Shift+V)">📋 Paste <span class="shortcut-hint">⌘⇧V</span></button>
                     <button id="addWebBtn" class="btn btn-primary" title="Add web page by URL (Cmd+Shift+U)">+ Web <span class="shortcut-hint">⌘⇧U</span></button>
                     <button id="autoFileBtn" class="btn btn-secondary" title="Auto-file this document (Cmd+Shift+F)">🗂️ Auto-File <span class="shortcut-hint">⌘⇧F</span></button>
                     <button id="editBtn" class="btn" style="display:none;">Edit</button>
@@ -78,6 +79,26 @@
                         <div class="modal-actions">
                             <button id="confirmRenameBtn" class="btn btn-primary">Rename</button>
                             <button onclick="closeRenameModal()" class="btn">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Paste Modal -->
+            <div id="quickPasteModal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📋 Quick Paste</h3>
+                        <button class="modal-close" onclick="closeQuickPasteModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="suggestion-box">
+                            <label>Paste your content here (rich text supported):</label>
+                            <div id="quickPasteArea" contenteditable="true" class="quick-paste-area" placeholder="Paste here..."></div>
+                        </div>
+                        <div class="modal-actions">
+                            <button id="confirmQuickPasteBtn" class="btn btn-primary">Create Page</button>
+                            <button onclick="closeQuickPasteModal()" class="btn">Cancel</button>
                         </div>
                     </div>
                 </div>
