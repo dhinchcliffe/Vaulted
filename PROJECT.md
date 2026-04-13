@@ -115,7 +115,13 @@ vaulted/
 - [ ] Multiple vault support
 
 ## Version History
-- **v0.10.13** (2026-04-10) - LAST KNOWN GOOD - Add 'Add Page' feature for folders
+- **v0.10.14** (2026-04-10) - LAST KNOWN GOOD - Quick Paste feature with rich text support
+  - '📋 Paste' button with ⌘⇧V accelerator
+  - Modal with contenteditable area for rich text
+  - Auto-pastes from clipboard, manual paste fallback
+  - Filename from first line, saves to ReadItLater Inbox
+
+- **v0.10.13** (2026-04-10) - Add 'Add Page' feature for folders
   - Right-click any folder to create a new blank document
   - Auto-sorts to top as 'A blank page.md'
   - Modal with Enter/Escape keyboard shortcuts
