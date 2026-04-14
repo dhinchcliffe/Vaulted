@@ -1215,6 +1215,76 @@ def rename_item():
         return jsonify({'error': f'Failed to rename: {str(e)}'}), 500
 
 
+@app.route('/api/search')
+def search_vault():
+    """Search all markdown files for a query term.
+    
+    Query param: q (required) - the search term
+    Returns: JSON array of results with path and preview
+    """
+    query = request.args.get('q', '').strip().lower()
+    if not query:
+        return jsonify({'error': 'No search query provided'}), 400
+    
+    results = []
+    
+    try:
+        for root, dirs, files in os.walk(VAULT_PATH):
+            # Skip hidden directories
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            
+            for filename in files:
+                if not filename.endswith('.md'):
+                    continue
+                
+                full_path = os.path.join(root, filename)
+                rel_path = os.path.relpath(full_path, VAULT_PATH)
+                
+                try:
+                    # Check if file is accessible (not sparse)
+                    with open(full_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Search in content (case-insensitive)
+                    content_lower = content.lower()
+                    if query in content_lower:
+                        # Find context around first match
+                        match_index = content_lower.find(query)
+                        start = max(0, match_index - 60)
+                        end = min(len(content), match_index + len(query) + 60)
+                        preview = content[start:end].strip()
+                        
+                        # Add ellipsis if truncated
+                        if start > 0:
+                            preview = '...' + preview
+                        if end < len(content):
+                            preview = preview + '...'
+                        
+                        # Count matches
+                        match_count = content_lower.count(query)
+                        
+                        results.append({
+                            'path': rel_path,
+                            'preview': preview,
+                            'matches': match_count
+                        })
+                except (OSError, PermissionError, IOError):
+                    # Skip files that can't be read (sparse sync)
+                    continue
+        
+        # Sort by number of matches (descending)
+        results.sort(key=lambda x: x['matches'], reverse=True)
+        
+        return jsonify({
+            'query': query,
+            'results': results,
+            'count': len(results)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Search failed: {str(e)}'}), 500
+
+
 @app.route('/api/restart', methods=['POST'])
 def restart_server():
     """Graceful restart - terminates this process.

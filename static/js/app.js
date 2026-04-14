@@ -394,6 +394,29 @@ function redo() {
 
 // Setup event listeners
 function setupEventListeners() {
+    // Search button
+    const searchBtn = document.getElementById('searchBtn');
+    if (searchBtn) {
+        searchBtn.addEventListener('click', openSearch);
+    }
+
+    // Search close button
+    const searchCloseBtn = document.getElementById('searchCloseBtn');
+    if (searchCloseBtn) {
+        searchCloseBtn.addEventListener('click', closeSearch);
+    }
+
+    // Search input
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(performSearch, 300));
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeSearch();
+            }
+        });
+    }
+
     // Quick Paste button
     const quickPasteBtn = document.getElementById('quickPasteBtn');
     if (quickPasteBtn) {
@@ -408,6 +431,11 @@ function setupEventListeners() {
 
     // Global keyboard shortcuts (not just in editor)
     document.addEventListener('keydown', (e) => {
+        // Cmd/Ctrl + Shift + S for Search
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            openSearch();
+        }
         // Cmd/Ctrl + Shift + V for Quick Paste
         if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
             e.preventDefault();
@@ -1103,6 +1131,122 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// Debounce utility
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Search state
+let isSearchActive = false;
+let lastSearchQuery = '';
+
+// Open search panel
+function openSearch() {
+    const searchPanel = document.getElementById('searchPanel');
+    const fileTree = document.getElementById('fileTree');
+    const searchInput = document.getElementById('searchInput');
+    
+    isSearchActive = true;
+    searchPanel.style.display = 'flex';
+    fileTree.style.display = 'none';
+    
+    // Focus input and select any existing text
+    searchInput.focus();
+    searchInput.select();
+    
+    // If there's already a query, refresh results
+    if (searchInput.value.trim()) {
+        performSearch();
+    }
+}
+
+// Close search panel
+function closeSearch() {
+    const searchPanel = document.getElementById('searchPanel');
+    const fileTree = document.getElementById('fileTree');
+    const searchInput = document.getElementById('searchInput');
+    
+    isSearchActive = false;
+    searchPanel.style.display = 'none';
+    fileTree.style.display = 'block';
+    
+    // Clear search input
+    searchInput.value = '';
+    
+    // Highlight current file in tree
+    if (currentFile) {
+        highlightTreeItem(currentFile);
+    }
+}
+
+// Perform search
+async function performSearch() {
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+    const query = searchInput.value.trim();
+    
+    if (!query) {
+        searchResults.innerHTML = '<div class="search-placeholder">Type to search...</div>';
+        return;
+    }
+    
+    lastSearchQuery = query;
+    searchResults.innerHTML = '<div class="search-placeholder">Searching...</div>';
+    
+    try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            searchResults.innerHTML = `<div class="search-no-results">Error: ${escapeHtml(data.error)}</div>`;
+            return;
+        }
+        
+        if (data.count === 0) {
+            searchResults.innerHTML = '<div class="search-no-results">No results found</div>';
+            return;
+        }
+        
+        // Render results
+        let html = '';
+        data.results.forEach(result => {
+            const isActive = result.path === currentFile ? 'active' : '';
+            html += `
+                <div class="search-result-item ${isActive}" data-path="${escapeHtml(result.path)}">
+                    <div class="search-result-path">${escapeHtml(result.path)}</div>
+                    <div class="search-result-preview">${escapeHtml(result.preview)}</div>
+                    <div class="search-result-count">${result.matches} match${result.matches !== 1 ? 'es' : ''}</div>
+                </div>
+            `;
+        });
+        
+        searchResults.innerHTML = html;
+        
+        // Add click handlers to results
+        document.querySelectorAll('.search-result-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const path = item.dataset.path;
+                loadFile(path);
+                // Update active state
+                document.querySelectorAll('.search-result-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+            });
+        });
+        
+    } catch (error) {
+        console.error('Search failed:', error);
+        searchResults.innerHTML = '<div class="search-no-results">Search failed. Check console for details.</div>';
+    }
+}
 
 // Start
 init();

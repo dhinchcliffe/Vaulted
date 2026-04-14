@@ -17,6 +17,18 @@
                     <span class="status-text" id="statusText">Loading...</span>
                 </div>
             </div>
+            
+            <!-- Search Panel (hidden by default) -->
+            <div class="search-panel" id="searchPanel" style="display: none;">
+                <div class="search-header">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search vault..." autocomplete="off">
+                    <button id="searchCloseBtn" class="search-close" title="Close search (Esc)">×</button>
+                </div>
+                <div class="search-results" id="searchResults">
+                    <div class="search-placeholder">Type to search...</div>
+                </div>
+            </div>
+            
             <div class="tree" id="fileTree">
                 <div class="loading">Loading vault...</div>
             </div>
@@ -25,6 +37,7 @@
             <div class="toolbar">
                 <span id="currentFile">Select a file</span>
                 <div class="toolbar-actions">
+                    <button id="searchBtn" class="btn btn-secondary" title="Search vault (Cmd+Shift+S)">🔍 Search <span class="shortcut-hint">⌘⇧S</span></button>
                     <button id="quickPasteBtn" class="btn btn-primary" title="Quick paste from clipboard (Cmd+Shift+V)">📋 Paste <span class="shortcut-hint">⌘⇧V</span></button>
                     <button id="addWebBtn" class="btn btn-primary" title="Add web page by URL (Cmd+Shift+U)">+ Web <span class="shortcut-hint">⌘⇧U</span></button>
                     <button id="autoFileBtn" class="btn btn-secondary" title="Auto-file this document (Cmd+Shift+F)">🗂️ Auto-File <span class="shortcut-hint">⌘⇧F</span></button>
