@@ -56,7 +56,7 @@ async function init() {
     setupEventListeners();
     
     // Refresh status periodically
-    setInterval(loadVaultStatus, 10000);
+    setInterval(loadVaultStatus, 60000);
 }
 
 // Load vault status
@@ -984,8 +984,8 @@ async function confirmRename() {
             // Refresh tree
             await loadFileTree();
             // If renamed file was open, update currentFile and reload
-            if (currentFile === oldPath) {
-                currentFile = newPath;
+            if (currentFile === oldPath || (currentFile && currentFile.startsWith(oldPath + '/'))) {
+                currentFile = newPath + currentFile.slice(oldPath.length);
                 localStorage.setItem('vaulted_lastFile', currentFile);
                 currentFileLabel.textContent = currentFile;
             }

@@ -34,9 +34,7 @@ def install_auth(app):
             try:set_session(auth_call('token?grant_type=refresh_token',{'refresh_token':session['refresh_token']}))
             except VaultError:
                 session.clear();raise
-        auth_call('user',token=session['access_token'],method='GET')
         g.vault=SupabaseVault(session['access_token'])
-        if not g.vault.call('GET','/rest/v1/vault_members',params={'select':'user_id','limit':1}).json():raise VaultError('This account does not have access to this vault',403)
 
 @bp.route('/login',methods=['GET','POST'])
 def login():
