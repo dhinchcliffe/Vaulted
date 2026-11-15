@@ -288,13 +288,13 @@ function renderPreview(content) {
                 const fromParam = currentFileForContext ? `?from=${encodeURIComponent(currentFileForContext)}` : '';
                 fullPath = '/api/attachment/' + encodeURIComponent(imagePath) + fromParam;
             }
-            return `<img src="${fullPath}" alt="${imagePath}" style="max-width: 100%;">`;
+            return `<img src="${escapeHtml(fullPath)}" alt="${escapeHtml(imagePath)}" style="max-width: 100%;">`;
         }
     );
     
     // Custom renderer for standard markdown images
     const renderer = new marked.Renderer();
-    renderer.image = ({ href, title, text }) => {
+    renderer.image = (href, title, text) => {
         // Handle protocol-relative URLs (//example.com/image.jpg -> https://example.com/image.jpg)
         if (href && href.startsWith('//')) {
             href = 'https:' + href;
@@ -315,8 +315,8 @@ function renderPreview(content) {
             href = '/api/attachment/' + encodeURIComponent(imagePath);
         }
         // External URLs (https://) pass through unchanged
-        const titleAttr = title ? ` title="${title}"` : '';
-        return `<img src="${href}" alt="${text}"${titleAttr} style="max-width: 100%;">`;
+        const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+        return `<img src="${escapeHtml(href || "")}" alt="${escapeHtml(text || "")}"${titleAttr} style="max-width: 100%;">`;
     };
     
     preview.innerHTML = DOMPurify.sanitize(marked.parse(processedContent, { renderer, mangle: false, headerIds: false }));
