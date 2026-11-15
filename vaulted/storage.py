@@ -49,6 +49,9 @@ class SupabaseVault:
     def download(self,row):
         r=self.call('GET','/storage/v1/object/authenticated/vault-original/'+quote(row['object_key'],safe='/'))
         return r.content
+    def download_url(self,row):
+        data=self.call('POST','/storage/v1/object/sign/vault-original/'+quote(row['object_key'],safe='/'),json={'expiresIn':60}).json()
+        return self.url+'/storage/v1'+data['signedURL']
 
 def build_tree(rows):
     root={}

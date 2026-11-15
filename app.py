@@ -1,7 +1,7 @@
 """Vaulted HTTP interface; persistence, authentication, capture are separate modules."""
 import os,re,posixpath,mimetypes
 from datetime import datetime,timezone
-from flask import Flask,render_template,jsonify,request,g,Response
+from flask import Flask,render_template,jsonify,request,g,Response,redirect
 from vaulted.auth import install_auth
 from vaulted.storage import VaultError,valid_path,build_tree
 from vaulted.capture import fetch_web_page,html_to_markdown
@@ -61,6 +61,8 @@ def attachment(filepath):
         except VaultError as e:
             if e.status in (400,404):continue
             raise
+        if row['content'] is None and row['size']>3*1024*1024:
+            return redirect(g.vault.download_url(row))
         data=row['content'].encode() if row['content'] is not None else g.vault.download(row)
         mime=row['mime'];r=Response(data,mimetype=mime)
         if mime not in ('image/png','image/jpeg','image/gif','image/webp','image/avif','application/pdf'):
