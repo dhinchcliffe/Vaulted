@@ -24,4 +24,4 @@ Verify all uploaded objects against SHA-256, compare original counts and byte to
 
 ## Known differences / setup
 
-AI filing requires `OPENAI_API_KEY`, which was not present in the uploaded app. Existing external images remain external; migration does not claim they have been archived. X pages that refuse server fetching can still be added using Quick Paste. Obsidian device sync remains on Dropbox until explicitly migrated; cloud edits are not bidirectionally synced back to Dropbox. Restarting a Mac server is no longer applicable.
+AI filing requires `OPENROUTER_API_KEY`, which was not present in the uploaded app. `OPENROUTER_MODEL` defaults to `openai/gpt-4o-mini` and can be changed independently. Existing external images remain external; migration does not claim they have been archived. X pages that refuse server fetching can still be added using Quick Paste. Obsidian device sync remains on Dropbox until explicitly migrated; cloud edits are not bidirectionally synced back to Dropbox. Restarting a Mac server is no longer applicable.
