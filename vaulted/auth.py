@@ -1,5 +1,5 @@
 """Supabase Auth sessions in secure, HttpOnly cookies; membership enforced by RLS."""
-import os,time
+import os,time,secrets,hmac
 from datetime import timedelta
 import requests
 from flask import Blueprint,session,request,redirect,render_template,jsonify,g
@@ -20,15 +20,30 @@ def install_auth(app):
     app.secret_key=os.environ.get('SESSION_SECRET')
     app.config.update(SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SECURE=bool(os.environ.get('VERCEL')),SESSION_COOKIE_SAMESITE='Strict',PERMANENT_SESSION_LIFETIME=timedelta(hours=96),MAX_CONTENT_LENGTH=4*1024*1024)
     app.register_blueprint(bp)
+    def csrf_token():
+        if 'csrf_token' not in session:session['csrf_token']=secrets.token_urlsafe(32)
+        return session['csrf_token']
+    app.jinja_env.globals['csrf_token']=csrf_token
     @app.before_request
     def protect():
         if request.method not in ('GET','HEAD','OPTIONS'):
-            origin=request.headers.get('Origin')
-            # Vercel terminates HTTPS before forwarding HTTP to Flask.
-            # Compare to the public scheme, retaining exact host matching.
-            public_origin=('https://'+request.host) if os.environ.get('VERCEL') else request.host_url.rstrip('/')
-            if origin and origin.rstrip('/')!=public_origin:raise VaultError('Cross-site request rejected',403)
-            if request.path.startswith('/api/') and request.headers.get('X-Vaulted-Request')!='1':raise VaultError('Missing request protection',403)
+            if request.path.startswith('/api/'):
+                origin=request.headers.get('Origin')
+                public_origin=('https://'+request.host) if os.environ.get('VERCEL') else request.host_url.rstrip('/')
+                allowed={public_origin}
+                if os.environ.get('VERCEL'):
+                    allowed.add('https://vaulted-sable.vercel.app')
+                    for key in ('VERCEL_URL','VERCEL_PROJECT_PRODUCTION_URL'):
+                        if os.environ.get(key):allowed.add('https://'+os.environ[key])
+                if origin and origin.rstrip('/') not in allowed:raise VaultError('Cross-site request rejected',403)
+                if request.headers.get('X-Vaulted-Request')!='1':raise VaultError('Missing request protection',403)
+            else:
+                # Browser forms authenticate their originating session, independent
+                # of proxy host/scheme rewrites or browser Origin handling.
+                expected=session.get('csrf_token','')
+                supplied=request.form.get('csrf_token','')
+                if not expected or not hmac.compare_digest(expected,supplied):
+                    raise VaultError('This form expired. Reload the page and try again.',403)
         if request.endpoint in ('auth.login','static','health'):return
         if not session.get('access_token'):
             if request.path.startswith('/api/'):raise VaultError('Please sign in again',401)
