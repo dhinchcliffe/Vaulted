@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vaulted</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/vendor/marked.min.js"></script>
+    <script src="/static/vendor/purify.min.js"></script>
 </head>
 <body>
     <div class="app">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h1>Vaulted</h1>
+                <h1>Vaulted</h1><a href="/account" style="color:#aeb8c9;font-size:12px">Account / sign out</a>
                 <div class="vault-status" id="vaultStatus">
                     <span class="status-dot" id="statusDot"></span>
                     <span class="status-text" id="statusText">Loading...</span>
