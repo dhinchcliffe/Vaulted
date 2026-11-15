@@ -24,7 +24,10 @@ def install_auth(app):
     def protect():
         if request.method not in ('GET','HEAD','OPTIONS'):
             origin=request.headers.get('Origin')
-            if origin and origin.rstrip('/')!=request.host_url.rstrip('/'):raise VaultError('Cross-site request rejected',403)
+            # Vercel terminates HTTPS before forwarding HTTP to Flask.
+            # Compare to the public scheme, retaining exact host matching.
+            public_origin=('https://'+request.host) if os.environ.get('VERCEL') else request.host_url.rstrip('/')
+            if origin and origin.rstrip('/')!=public_origin:raise VaultError('Cross-site request rejected',403)
             if request.path.startswith('/api/') and request.headers.get('X-Vaulted-Request')!='1':raise VaultError('Missing request protection',403)
         if request.endpoint in ('auth.login','static','health'):return
         if not session.get('access_token'):
