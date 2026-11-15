@@ -285,8 +285,8 @@ function renderPreview(content) {
                     imagePath = imagePath.substring(2);
                 }
                 // Pass current file context so backend can try local folder
-                const fromParam = currentFileForContext ? `?from=${encodeURIComponent(currentFileForContext)}` : '';
-                fullPath = '/api/attachment/' + encodeURIComponent(imagePath) + fromParam;
+                const fromParam = currentFileForContext ? `&from=${encodeURIComponent(currentFileForContext)}` : '';
+                fullPath = '/api/attachment?path=' + encodeURIComponent(imagePath) + fromParam;
             }
             return `<img src="${escapeHtml(fullPath)}" alt="${escapeHtml(imagePath)}" style="max-width: 100%;">`;
         }
@@ -312,7 +312,7 @@ function renderPreview(content) {
             if (!imagePath.startsWith('/')) {
                 imagePath = vaultBase + imagePath;
             }
-            href = '/api/attachment/' + encodeURIComponent(imagePath);
+            href = '/api/attachment?path=' + encodeURIComponent(imagePath);
         }
         // External URLs (https://) pass through unchanged
         const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';

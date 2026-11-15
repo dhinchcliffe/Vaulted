@@ -50,8 +50,10 @@ def search():
     q=request.args.get('q','').strip()[:200]
     if not q:raise VaultError('Enter a search term')
     rows=g.vault.search(q);return jsonify(query=q,results=rows,count=len(rows))
+@app.get('/api/attachment')
 @app.get('/api/attachment/<path:filepath>')
-def attachment(filepath):
+def attachment(filepath=None):
+    filepath=filepath if filepath is not None else request.args.get('path','')
     paths=[];origin=request.args.get('from','')
     if '/' in filepath:paths.append(filepath)
     if origin:paths.append(posixpath.normpath(posixpath.join(posixpath.dirname(origin),filepath)))
