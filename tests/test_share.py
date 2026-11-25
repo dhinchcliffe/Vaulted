@@ -20,7 +20,7 @@ def test_invalid_capture(value):
 
 def test_long_x_text_and_still_images(monkeypatch):
     long_text = 'Long post paragraph.\n' * 1200
-    monkeypatch.setattr(sc, 'fetch_x_post', lambda _: {'text': long_text, 'photos': ['![photo](https://pbs.twimg.com/media/example.jpg)'], 'author': 'Author'})
+    monkeypatch.setattr(sc, 'fetch_x_post', lambda _: {'text': long_text, 'photos': ['![photo](https://pbs.twimg.com/media/example.jpg)'], 'author': 'Author', 'lang': 'en'})
     note = sc.build_note({'url': 'https://x.com/author/status/1234567890?s=46'})
     assert long_text.strip() in note['content']
     assert 'Source: https://x.com/i/status/1234567890' in note['content']
@@ -45,7 +45,7 @@ def test_link_only_failure_is_explicit(monkeypatch):
 
 
 def test_safari_content_not_replaced_by_shorter_x_excerpt(monkeypatch):
-    monkeypatch.setattr(sc, 'fetch_x_post', lambda _: {'text': 'Truncated', 'photos': [], 'author': 'Author'})
+    monkeypatch.setattr(sc, 'fetch_x_post', lambda _: {'text': 'Truncated', 'photos': [], 'author': 'Author', 'lang': 'en'})
     note = sc.build_note({'url': 'https://x.com/a/status/1234567890', 'html': '<p>' + 'Long content ' * 100 + '</p>'})
     assert 'Long content ' * 99 in note['content']
 

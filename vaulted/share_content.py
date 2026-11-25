@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 
 from .capture import fetch_web_page, html_to_markdown
 from .storage import VaultError
+from .translation import translate_x_text, plain_markdown
 
 MAX_TEXT = 700_000
 X_HOSTS = {'x.com', 'www.x.com', 'mobile.x.com', 'twitter.com', 'www.twitter.com', 'mobile.twitter.com'}
@@ -54,9 +55,9 @@ def clean_html(html, url):
     return html_to_markdown(str(soup)).strip()
 
 
-def fetch_x_post(post_id):
+def fetch_x_post(post_id, translate_to=None):
     # Only the public post ID is sent to FxTwitter. No vault data, cookies or tokens.
-    response = requests.get('https://api.fxtwitter.com/status/' + post_id,
+    response = requests.get('https://api.fxtwitter.com/status/' + post_id + ('/en' if translate_to == 'en' else ''),
                             headers={'User-Agent': 'Vaulted/1.1 Research capture'},
                             timeout=(5, 15), stream=True, allow_redirects=False)
     try:
@@ -87,7 +88,8 @@ def fetch_x_post(post_id):
             photos.append(f'![{alt}](<{image}>)')
     author = tweet.get('author') or {}
     name = author.get('name') or author.get('screen_name') or 'X'
-    return {'text': text, 'photos': photos, 'author': str(name)}
+    return {'text': text, 'photos': photos, 'author': str(name),
+            'lang': tweet.get('lang') or '', 'translation': tweet.get('translation')}
 
 
 def normalize_payload(data):
@@ -132,8 +134,13 @@ def build_note(payload):
     method = 'Shared page' if html else 'Shared text'
     if post_id:
         canonical = f'https://x.com/i/status/{post_id}'
+        translation_source = BeautifulSoup(html, 'html.parser').get_text('\n', strip=True) if html else text
+        translation_language = ''
+        translation_lookup = None
+        author = 'X'
         try:
             post = fetch_x_post(post_id)
+            author = post['author']
             # Prefer fuller text captured in Safari when the public service is truncated.
             supplied_text = BeautifulSoup(html, 'html.parser').get_text(' ', strip=True) if html else text
             if len(supplied_text) > len(post['text']) and supplied_text != url:
@@ -142,12 +149,29 @@ def build_note(payload):
             else:
                 body = post['text'] + '\n\n' + '\n\n'.join(post['photos'])
                 method = 'Public X post via FxTwitter'
+                translation_source = post['text']
+                translation_language = post.get('lang', '')
+                translation_lookup = lambda: fetch_x_post(post_id, translate_to='en')
             title = title or f"{post['author']} — {post['text'].splitlines()[0][:90]}"
         except (requests.RequestException, ValueError, TypeError, AttributeError):
             warnings.append('X retrieval was unavailable. Shared text was kept; for the full post, open it in Safari, expand the text and share again.')
             if not body or body == url:
                 body = 'Post content could not be retrieved. The source link is saved for follow-up.'
                 title = title or f'X post {post_id}'
+        if translation_source.strip() and translation_source.strip() != url:
+            translated, translation_warning = translate_x_text(translation_source, translation_language, translation_lookup)
+            if translated:
+                translated_body = ('## English translation\n\n' + plain_markdown(translated['text'])
+                        + '\n\nTranslation: ' + translated['provider'] + ' · ' + translated['language']
+                        + ' → English. Wording may differ from X’s displayed translation.\n\n'
+                        + '## Original captured content\n\n' + body)
+                if len(translated_body.encode()) <= MAX_TEXT:
+                    body = translated_body
+                    title = f"{author} — {translated['text'].splitlines()[0][:90]}"
+                else:
+                    warnings.append('English translation exceeded the note size limit. The complete original was saved.')
+            elif translation_warning:
+                warnings.append(translation_warning)
         url = canonical
     elif url and not html and (not text or text == url):
         try:

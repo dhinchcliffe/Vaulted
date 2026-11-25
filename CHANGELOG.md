@@ -1,3 +1,10 @@
+# 2026-11-25 — English translations for X shares
+
+- Baseline: baseline/before-x-translation-2026-11-25 at 925ad72.
+- Add English-first translations for foreign-language X captures, retain original content and source URL, and use an English title. Known-English posts skip translation.
+- Use the public post translation endpoint with original-text matching, then the existing AI service as fallback; handle long posts in bounded chunks and reject truncated output. Failures keep the captured original with a visible notice. Model output is escaped to prevent new image embeds.
+- No Shortcut reinstall, schema change or rewrite of existing research notes. Validation: 73 tests passed, including translation fallback, English bypass, full originals, images, truncation and note-size handling.
+
 # 2026-11-25 — self-contained captured images
 
 - Baseline: baseline/before-local-images-2026-11-25 at 8d809ad.
