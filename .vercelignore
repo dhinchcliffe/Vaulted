@@ -8,4 +8,4 @@ scripts
 .env*
 .venv
 supabase
-shortcuts
+/shortcuts
