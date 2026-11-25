@@ -6,3 +6,6 @@ migrations
 scripts
 *.log
 .env*
+.venv
+supabase
+shortcuts

@@ -36,7 +36,7 @@ def fetch_web_page(url):
     soup=BeautifulSoup(data,'html.parser')
     title=soup.title.get_text(' ',strip=True) if soup.title else 'Untitled'
     main=soup.select_one('article,main,[role=main]') or soup
-    for el in main.select('script,style,nav,footer,iframe,form'):el.decompose()
+    for el in main.select('script,style,nav,footer,iframe,form,video,audio,source,object,embed'):el.decompose()
     for el in main.select('[href],[src]'):
         for attr in ('href','src'):
             if el.get(attr):el[attr]=urljoin(url,el[attr])

@@ -20,3 +20,4 @@ venv/
 migration-private*
 research-original/
 upload/
+supabase/.temp/

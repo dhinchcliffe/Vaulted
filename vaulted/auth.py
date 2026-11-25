@@ -18,7 +18,7 @@ def set_session(data):
 
 def install_auth(app):
     app.secret_key=os.environ.get('SESSION_SECRET')
-    app.config.update(SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SECURE=bool(os.environ.get('VERCEL')),SESSION_COOKIE_SAMESITE='Strict',PERMANENT_SESSION_LIFETIME=timedelta(hours=96),MAX_CONTENT_LENGTH=4*1024*1024)
+    app.config.update(SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SECURE=bool(os.environ.get('VERCEL')),SESSION_COOKIE_SAMESITE='Lax',PERMANENT_SESSION_LIFETIME=timedelta(hours=96),MAX_CONTENT_LENGTH=4*1024*1024)
     app.register_blueprint(bp)
     def csrf_token():
         if 'csrf_token' not in session:session['csrf_token']=secrets.token_urlsafe(32)
@@ -26,6 +26,9 @@ def install_auth(app):
     app.jinja_env.globals['csrf_token']=csrf_token
     @app.before_request
     def protect():
+        # Exactly one endpoint accepts capture-only bearer credentials. It cannot
+        # read, edit or move existing notes. Its database RPC checks the capability.
+        if request.endpoint=='sharing.capture':return
         if request.method not in ('GET','HEAD','OPTIONS'):
             if request.path.startswith('/api/'):
                 origin=request.headers.get('Origin')
@@ -47,7 +50,8 @@ def install_auth(app):
         if request.endpoint in ('auth.login','static','health'):return
         if not session.get('access_token'):
             if request.path.startswith('/api/'):raise VaultError('Please sign in again',401)
-            return redirect('/login')
+            from urllib.parse import urlencode
+            return redirect('/login?'+urlencode({'next':request.path}))
         if session.get('expires_at',0)<time.time()+60:
             try:set_session(auth_call('token?grant_type=refresh_token',{'refresh_token':session['refresh_token']}))
             except VaultError:
@@ -62,7 +66,10 @@ def login():
             data=auth_call('token?grant_type=password',{'email':request.form.get('email','').strip(),'password':request.form.get('password','')})
             v=SupabaseVault(data['access_token'])
             if not v.call('GET','/rest/v1/vault_members',params={'select':'user_id','limit':1}).json():raise VaultError('Account not authorized',403)
-            session.clear();set_session(data);return redirect('/')
+            session.clear();set_session(data)
+            next_path=request.args.get('next','/')
+            if not next_path.startswith('/') or next_path.startswith('//') or '\\' in next_path or any(ord(c)<32 for c in next_path):next_path='/'
+            return redirect(next_path)
         except VaultError as e:error=e.message
     return render_template('login.html',error=error)
 @bp.post('/logout')

@@ -45,8 +45,11 @@ async function init() {
     await loadFileTree();
     
     // Try to load last opened file from localStorage
+    const capturePath = document.body.dataset.capturePath;
     const lastFile = localStorage.getItem('vaulted_lastFile');
-    if (lastFile) {
+    if (capturePath) {
+        await loadFile(capturePath);
+    } else if (lastFile) {
         await loadFile(lastFile);
     } else {
         // Load first markdown file
@@ -54,6 +57,9 @@ async function init() {
     }
     
     setupEventListeners();
+    if (capturePath && currentFile === capturePath) {
+        await autoFileDocument();
+    }
     
     // Refresh status periodically
     setInterval(loadVaultStatus, 60000);

@@ -1,3 +1,11 @@
+# 2026-11-25 — iOS share capture and official cloud version
+
+- Preserved desktop and cloud baselines on GitHub before changes. Main becomes the official cloud code line.
+- Added a signed Save to Vaulted share-sheet Shortcut, token setup/revocation page, capture-only Inbox API and authenticated review links that open Autofile automatically.
+- Capture Safari content and source URL; attempt complete public X post text and still photos through FxTwitter. Keep links/shared text with explicit warnings when retrieval fails. No video. Images remain linked.
+- Added private hashed capabilities, quota reservation and atomic idempotent capture insertion. Existing research records, buckets and file-access policies are unchanged.
+- Preserve review destination across login; retain existing mutation CSRF controls. Added backend regression tests and rollback-only SQL authorization tests.
+
 ## [Unreleased]
 
 ### Added

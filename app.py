@@ -6,8 +6,10 @@ from vaulted.auth import install_auth
 from vaulted.storage import VaultError,valid_path,build_tree
 from vaulted.capture import fetch_web_page,html_to_markdown
 from vaulted.filing import existing_folders,resolve_folder,suggest_folder
+from vaulted.sharing import bp as sharing_bp
 app=Flask(__name__,static_folder='public/static',static_url_path='/static')
 install_auth(app)
+app.register_blueprint(sharing_bp)
 @app.errorhandler(VaultError)
 def vault_error(e):return jsonify(error=e.message),e.status
 @app.errorhandler(Exception)
@@ -25,7 +27,7 @@ def headers(r):
     r.headers['Content-Security-Policy']="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
     return r
 @app.get('/health')
-def health():return jsonify(status='ok',version='1.0-cloud-preview')
+def health():return jsonify(status='ok',version='1.1-ios-share')
 @app.get('/')
 def index():return render_template('index.html')
 @app.get('/api/tree')

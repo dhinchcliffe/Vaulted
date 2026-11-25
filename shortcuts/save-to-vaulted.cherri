@@ -1,0 +1,30 @@
+#include 'actions/web'
+#include 'actions/crypto'
+#define name Save to Vaulted
+#define color blue
+#define glyph folder
+#define inputs webpage, url, text
+#define from sharesheet
+const token = text("PASTE_TOKEN_HERE")
+if !ShortcutInput {
+    alert("Open a Safari page or X post, tap Share, then Save to Vaulted.", "Save to Vaulted")
+    stop()
+}
+const inputType = typeOf(ShortcutInput)
+@payload = "{ShortcutInput}"
+if inputType contains "Safari" {
+    @payload = runJavaScriptOnWebpage("VAULTED_SAFARI_SCRIPT")
+}
+const random1 = randomNumber(0, 2147483647)
+const random2 = randomNumber(0, 2147483647)
+const requestSeed = text("{random1}:{random2}:{@payload}")
+const requestId = hash(requestSeed, "MD5")
+const response = jsonRequest("https://vaulted-sable.vercel.app/api/share/capture", "POST", {"payload": "{@payload}", "request_id": "{requestId}"}, {"Authorization": "Bearer {token}"})
+const result = getDictionary(response)
+const reviewURL = getValue(result, "review_url")
+if reviewURL {
+    openURL("{reviewURL}")
+} else {
+    const errorMessage = getValue(result, "error")
+    alert("{errorMessage}", "Could not save to Vaulted")
+}

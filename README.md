@@ -1,40 +1,21 @@
 # Vaulted
 
-A minimal, elegant web-based viewer and editor for Obsidian vaults.
+The official Vaulted application is the Vercel/Supabase version on `main`: https://vaulted-sable.vercel.app
 
-## Features
+Browse, search and edit the research vault, capture webpages and X posts, then use Autofile to suggest a destination you can adjust before filing.
 
-- **Tree View**: Browse your vault's directory structure on the left
-- **Markdown Editor**: View and edit markdown files on the right
-- **Auto-save**: Changes are saved automatically
-- **Undo Support**: Ctrl+Z to undo changes
-- **Last Opened**: Remembers which file you were editing
+## Save from iPhone or iPad
 
-## Setup
+Open https://vaulted-sable.vercel.app/share/setup, create your capture-only token, and install the signed Save to Vaulted shortcut. Share a Safari page or X post to save it and open Autofile. Source URLs and available still images are preserved; videos are excluded. See [shortcut instructions](shortcuts/README.md) for limitations and reproducible build steps.
 
-1. Install dependencies:
-   ```bash
-   pip install flask
-   ```
+## Development
 
-2. Run the app:
-   ```bash
-   python app.py
-   ```
+Install `requirements.txt` plus pytest; run `python -m pytest -q`. Configure the variables in `.env.example` through your deployment settings. `app.py` runs Flask; modules under `vaulted/` own authentication, storage, capture and filing.
 
-3. Open http://localhost:5006 in your browser
+The original cloud schema is in `migrations/001_vault.sql`. Subsequent changes are in `supabase/migrations/`. Never reapply the initial schema to an existing vault. See `MIGRATION.md` for cloud data and recovery details.
 
-## Configuration
+## Recovery baselines
 
-The vault path is configured in `app.py`:
-```python
-VAULT_PATH = os.path.expanduser("~/Dropbox/Apps/remotely-save/DPH Research")
-```
+Desktop hosting: `baseline/desktop-last-known-good-2026-11-25`, commit `3b4a49679394feb36ce9c78134f6742a3fbfd384`. This preserves the Mac/Dropbox application and its original setup instructions.
 
-## Auto-start
-
-The app includes a LaunchAgent for macOS auto-start:
-```bash
-# Load the LaunchAgent
-launchctl load ~/Library/LaunchAgents/com.openclaw.vaulted.plist
-```
+Cloud before iOS capture: `baseline/cloud-before-ios-share-2026-11-25`, commit `2f05fafa65d650e02d8ab80af0b89d84bb57d5fa`.
