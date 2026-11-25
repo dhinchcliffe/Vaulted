@@ -1,0 +1,36 @@
+# Save to Vaulted
+
+Install from https://vaulted-sable.vercel.app/share/setup while signed in. Create a capture-only token, copy it, download the signed shortcut, open in Shortcuts and paste the token into its setup question. Share one Safari page or X post. Review Autofile in Vaulted and adjust the destination before File Here.
+
+Safari extraction runs in the user's visible page. Enable Allow Running Scripts in Settings → Apps → Shortcuts → Advanced if prompted. X app shares normally provide a URL: the server uses FxTwitter's public API, selecting the longer returned text and still photos only. Shared Safari content takes precedence over a shorter public excerpt. If retrieval fails, preserve supplied content and the source link with a warning. Images remain external URLs, not archival copies. Threads and X Articles are not guaranteed.
+
+## Rebuild
+
+Use Cherri **v2.4.0** from its official release, then:
+
+```sh
+python shortcuts/build_shortcut.py
+cherri shortcuts/save-to-vaulted.cherri --skip-sign --derive-uuids
+mv 'shortcuts/Save to Vaulted_unsigned.shortcut' shortcuts/Save-to-Vaulted.unsigned.shortcut
+python shortcuts/build_shortcut.py --embed
+```
+
+The final step embeds the exact Safari JavaScript, binds it explicitly to Shortcut Input, and installs the token import question. The compiler's custom-action syntax differs across versions, so this small plist finalization is intentional. Request IDs use the MD5 hash of two random values and the payload solely as an idempotency identifier, not as a security credential. Capture tokens are independent cryptographically random values whose SHA-256 hashes are stored in the database.
+
+On a Mac, sign locally:
+
+```sh
+shortcuts sign --mode anyone --input shortcuts/Save-to-Vaulted.unsigned.shortcut --output public/static/shortcuts/Save-to-Vaulted.shortcut
+```
+
+This initial release was signed using Shortcuty's documented signing service. Only the generic, credential-free template was submitted. No token or vault data is sent to the signer. `signing-manifest.json` records input and signed SHA-256 values. The signed file has the Apple AEA1 container header. Final installation/execution still requires an actual iPhone or iPad test; server tests do not emulate iOS.
+
+## Security and deployment
+
+- Only `/api/share/capture` accepts a capture bearer token. It validates and reserves quota before remote fetching and saves through restricted database functions.
+- Tokens expire after one year, are revocable, limited to ten active tokens per member and 120 capture attempts/hour per token. Raw tokens are never stored.
+- The private tables have no direct client grants and deny all through RLS. Public RPC wrappers use SECURITY INVOKER; narrowly scoped private SECURITY DEFINER functions enforce membership or capability checks.
+- The capability cannot read, update, move or overwrite any existing note. Duplicate request IDs return the same file ID.
+- Review links contain a file UUID, never a token. Login preserves the review path; SameSite=Lax permits incoming GET navigation while existing POST origin/header/form-CSRF protections remain.
+- Production's custom application authentication protects the vault. Vercel Standard Protection protects previews/deployment URLs while allowing the production domain to receive authenticated Shortcut requests.
+- Run `python -m pytest -q`. Run `tests/share_security.sql` against the dedicated Vaulted database as an administrator; it rolls back all test writes.

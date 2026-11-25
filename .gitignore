@@ -13,3 +13,11 @@ build/
 venv/
 *.log
 .DS_Store
+
+.pytest_cache/
+.env.*
+!.env.example
+migration-private*
+research-original/
+upload/
+supabase/.temp/

@@ -17,6 +17,20 @@ body {
     height: 100vh;
 }
 
+.sidebar-header > a { display: inline-block; margin: 8px 12px 0 0; }
+.capture-back { color: #9cbcff; margin-right: 12px; }
+/* Keep the incoming share review usable on a phone, without changing desktop. */
+@media (max-width: 700px) {
+    body[data-capture-path] .sidebar { display: none; }
+    body[data-capture-path] .content { min-width: 0; width: 100%; }
+    body[data-capture-path] .toolbar { flex-wrap: wrap; gap: 10px; padding: 12px; }
+    body[data-capture-path] #currentFile { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    body[data-capture-path] .toolbar-actions { flex-wrap: wrap; gap: 8px; }
+    body[data-capture-path] .shortcut-hint { display: none; }
+    body[data-capture-path] .preview { padding: 16px; overflow-wrap: anywhere; }
+    body[data-capture-path] .modal-content { max-height: 90dvh; overflow-y: auto; }
+}
+
 /* Sidebar */
 .sidebar {
     width: 280px;

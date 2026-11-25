@@ -3,12 +3,28 @@
  */
 
 let currentFile = null;
+let currentRevision = null;
+let saveInFlight = null;
+let switchingFile = false;
 let currentContent = '';
 let isEditing = false;
 let saveTimeout = null;
 let undoStack = [];
 let undoIndex = -1;
 
+// Same-origin API writes and expired-session handling.
+const originalFetch = window.fetch.bind(window);
+window.fetch = async (url, options = {}) => {
+    options.headers = { ...options.headers, 'X-Vaulted-Request': '1' };
+    const response = await originalFetch(url, options);
+    if (response.status === 401) {
+        saveStatus.textContent = 'Session expired. Copy any unsaved text, then sign in again.';
+    }
+    return response;
+};
+window.addEventListener('beforeunload', event => {
+    if (currentFile && editor.value !== currentContent) { event.preventDefault(); event.returnValue = ''; }
+});
 // DOM Elements
 const fileTree = document.getElementById('fileTree');
 const preview = document.getElementById('preview');
@@ -29,8 +45,11 @@ async function init() {
     await loadFileTree();
     
     // Try to load last opened file from localStorage
+    const capturePath = document.body.dataset.capturePath;
     const lastFile = localStorage.getItem('vaulted_lastFile');
-    if (lastFile) {
+    if (capturePath) {
+        await loadFile(capturePath);
+    } else if (lastFile) {
         await loadFile(lastFile);
     } else {
         // Load first markdown file
@@ -38,9 +57,12 @@ async function init() {
     }
     
     setupEventListeners();
+    if (capturePath && currentFile === capturePath) {
+        await autoFileDocument();
+    }
     
     // Refresh status periodically
-    setInterval(loadVaultStatus, 10000);
+    setInterval(loadVaultStatus, 60000);
 }
 
 // Load vault status
@@ -174,17 +196,23 @@ async function loadFirstFile() {
 
 // Load a file
 async function loadFile(path) {
+    if (switchingFile) return;
+    switchingFile = true;
+    clearTimeout(saveTimeout);
     try {
+        if (currentFile && editor.value !== currentContent && !await saveFile()) return;
         const response = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
         const data = await response.json();
         
         if (data.error) {
+            saveStatus.textContent = data.error;
             console.error('Error loading file:', data.error);
             return;
         }
         
         currentFile = path;
         currentContent = data.content;
+        currentRevision = data.revision;
         
         // Update UI
         currentFileLabel.textContent = path;
@@ -213,7 +241,7 @@ async function loadFile(path) {
         
     } catch (error) {
         console.error('Failed to load file:', error);
-    }
+    } finally { switchingFile = false; }
 }
 
 // Render markdown preview
@@ -263,16 +291,16 @@ function renderPreview(content) {
                     imagePath = imagePath.substring(2);
                 }
                 // Pass current file context so backend can try local folder
-                const fromParam = currentFileForContext ? `?from=${encodeURIComponent(currentFileForContext)}` : '';
-                fullPath = '/api/attachment/' + encodeURIComponent(imagePath) + fromParam;
+                const fromParam = currentFileForContext ? `&from=${encodeURIComponent(currentFileForContext)}` : '';
+                fullPath = '/api/attachment?path=' + encodeURIComponent(imagePath) + fromParam;
             }
-            return `<img src="${fullPath}" alt="${imagePath}" style="max-width: 100%;">`;
+            return `<img src="${escapeHtml(fullPath)}" alt="${escapeHtml(imagePath)}" style="max-width: 100%;">`;
         }
     );
     
     // Custom renderer for standard markdown images
     const renderer = new marked.Renderer();
-    renderer.image = ({ href, title, text }) => {
+    renderer.image = (href, title, text) => {
         // Handle protocol-relative URLs (//example.com/image.jpg -> https://example.com/image.jpg)
         if (href && href.startsWith('//')) {
             href = 'https:' + href;
@@ -290,14 +318,14 @@ function renderPreview(content) {
             if (!imagePath.startsWith('/')) {
                 imagePath = vaultBase + imagePath;
             }
-            href = '/api/attachment/' + encodeURIComponent(imagePath);
+            href = '/api/attachment?path=' + encodeURIComponent(imagePath);
         }
         // External URLs (https://) pass through unchanged
-        const titleAttr = title ? ` title="${title}"` : '';
-        return `<img src="${href}" alt="${text}"${titleAttr} style="max-width: 100%;">`;
+        const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+        return `<img src="${escapeHtml(href || "")}" alt="${escapeHtml(text || "")}"${titleAttr} style="max-width: 100%;">`;
     };
     
-    preview.innerHTML = marked.parse(processedContent, { renderer, mangle: false, headerIds: false });
+    preview.innerHTML = DOMPurify.sanitize(marked.parse(processedContent, { renderer, mangle: false, headerIds: false }));
 }
 
 // Update view based on editing state
@@ -329,35 +357,26 @@ function queueSave() {
 
 // Save file to server
 async function saveFile() {
-    if (!currentFile) return;
-    
-    try {
-        const response = await fetch('/api/file', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                path: currentFile,
-                content: editor.value
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            currentContent = editor.value;
-            saveStatus.textContent = 'Saved';
-            saveStatus.className = 'save-status saved';
-            setTimeout(() => {
-                saveStatus.textContent = '';
-            }, 2000);
-        } else {
-            saveStatus.textContent = 'Error';
-            console.error('Save failed:', data.error);
+    if (saveInFlight) { await saveInFlight; if (editor.value === currentContent) return true; }
+    if (!currentFile || editor.value === currentContent) return true;
+    const path = currentFile, content = editor.value, revision = currentRevision;
+    saveInFlight = (async () => {
+        try {
+            const response = await fetch('/api/file', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({path,content,revision}) });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.error || 'Save failed');
+            if (currentFile === path) { currentContent = content; currentRevision = data.revision; }
+            saveStatus.textContent = 'Saved'; saveStatus.className = 'save-status saved';
+            return true;
+        } catch (error) {
+            saveStatus.textContent = error.message + ' Your edits remain in the editor.';
+            saveStatus.className = 'save-status error';
+            return false;
         }
-    } catch (error) {
-        saveStatus.textContent = 'Error';
-        console.error('Failed to save:', error);
-    }
+    })();
+    const ok = await saveInFlight; saveInFlight = null;
+    if (ok && editor.value !== currentContent) return saveFile();
+    return ok;
 }
 
 // Push to undo stack
@@ -518,7 +537,7 @@ function openQuickPasteModal() {
                 if (item.types.includes('text/html')) {
                     item.getType('text/html').then(blob => {
                         blob.text().then(html => {
-                            pasteArea.innerHTML = html;
+                            pasteArea.innerHTML = DOMPurify.sanitize(html);
                         });
                     });
                     return;
@@ -646,7 +665,7 @@ async function addWebPage() {
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
-    return div.innerHTML;
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // Auto-File Modal Functions
@@ -744,6 +763,7 @@ async function autoFileDocument() {
 }
 
 async function confirmAutoFile(targetFolder) {
+    if (!await saveFile()) return;
     if (!currentFile || !targetFolder) return;
     
     const confirmBtn = document.getElementById('confirmFileBtn');
@@ -936,6 +956,7 @@ function closeRenameModal() {
 }
 
 async function confirmRename() {
+    if (!await saveFile()) return;
     if (!contextMenuTarget) return;
 
     const input = document.getElementById('renameInput');
@@ -969,8 +990,8 @@ async function confirmRename() {
             // Refresh tree
             await loadFileTree();
             // If renamed file was open, update currentFile and reload
-            if (currentFile === oldPath) {
-                currentFile = newPath;
+            if (currentFile === oldPath || (currentFile && currentFile.startsWith(oldPath + '/'))) {
+                currentFile = newPath + currentFile.slice(oldPath.length);
                 localStorage.setItem('vaulted_lastFile', currentFile);
                 currentFileLabel.textContent = currentFile;
             }

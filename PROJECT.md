@@ -1,3 +1,5 @@
+> Current status (2026-11-25): the official application is the Vercel/Supabase version on `main`. See README.md, MIGRATION.md and shortcuts/README.md. The desktop documentation below is historical, preserved for the last-known-good desktop baseline.
+
 # Vaulted - Project Documentation
 
 ## Overview

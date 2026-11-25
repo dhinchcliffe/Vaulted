@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vaulted</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/vendor/marked.min.js"></script>
+    <script src="/static/vendor/purify.min.js"></script>
 </head>
-<body>
+<body{% if capture_path %} data-capture-path="{{ capture_path }}"{% endif %}>
     <div class="app">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h1>Vaulted</h1>
+                <h1>Vaulted</h1><a href="/account" style="color:#aeb8c9;font-size:12px">Account / sign out</a><a href="/share/setup" style="color:#aeb8c9;font-size:12px">Save from iPhone</a>
                 <div class="vault-status" id="vaultStatus">
                     <span class="status-dot" id="statusDot"></span>
                     <span class="status-text" id="statusText">Loading...</span>
@@ -35,6 +36,7 @@
         </aside>
         <main class="content">
             <div class="toolbar">
+                {% if capture_path %}<a href="/" class="capture-back">Vault</a>{% endif %}
                 <span id="currentFile">Select a file</span>
                 <div class="toolbar-actions">
                     <button id="searchBtn" class="btn btn-secondary" title="Search vault (Cmd+Shift+S)">🔍 Search <span class="shortcut-hint">⌘⇧S</span></button>

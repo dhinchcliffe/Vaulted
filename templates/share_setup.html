@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Save to Vaulted · Setup</title><link rel="stylesheet" href="/static/css/style.css">
+<style>body{height:auto;min-height:100vh;overflow:auto;padding:24px;box-sizing:border-box}main{max-width:680px;margin:0 auto}h1,h2,p,li{margin-bottom:16px}h2{margin-top:28px}p,li{line-height:1.6}a{color:#9cbcff}button{margin:6px 0}textarea{display:block;width:100%;box-sizing:border-box;padding:12px;background:#16191f;color:#fff;border:1px solid #586174;border-radius:8px}li{margin-left:20px}.muted{color:#b1b8c6}.token-row{padding:12px 0;border-bottom:1px solid #393e49}#status{white-space:pre-wrap}</style></head>
+<body><main><p><a href="/">← Back to Vaulted</a></p><h1>Save to Vaulted</h1>
+<p>Share a Safari page or an X post, then review Autofile’s suggested folder in Vaulted. Your note is saved in ReadItLater Inbox before AI runs.</p>
+<ol>
+<li><button class="btn btn-primary" id="createToken">Create shortcut token</button><div id="newToken" hidden><p>Copy this token now. It is shown only once. Keep it private: it allows new captures, but cannot read or change existing notes.</p><textarea id="token" readonly rows="2" aria-label="Shortcut capture token"></textarea><button class="btn" id="copyToken">Copy token</button></div></li>
+<li><a class="btn" href="/static/shortcuts/Save-to-Vaulted.shortcut" download>Download Save to Vaulted</a><p>Open the downloaded file in Shortcuts (or Files → Downloads → Save-to-Vaulted.shortcut). Tap Set Up Shortcut, paste your token when asked, then Add Shortcut.</p></li>
+<li>In Safari, open a page, tap Share, then Save to Vaulted. Allow the requested webpage access and connection to vaulted-sable.vercel.app. Sign into Vaulted if asked. Edit the suggested folder and tap File Here.</li>
+</ol>
+<p>If Safari capture asks you to enable scripts: Settings → Apps → Shortcuts → Advanced → Allow Running Scripts. To find the shortcut in Share, scroll down; use Edit Actions to add it to Favorites.</p>
+<h2>From X</h2><p>Tap the post’s Share icon → Share via… → Save to Vaulted. Vaulted attempts to retrieve the public post’s full text and still images. It always preserves the source URL. Public X lookup uses FxTwitter, which receives only the post ID, never your token or vault contents.</p>
+<p>If X retrieval is unavailable, the source link and any shared text are saved with an explanation. For a fuller capture, open the post in Safari, expand any “Show more” text, then share it from there. Protected posts require sharing the content you can view in Safari or copied text. No video is imported.</p>
+<p class="muted">Images are linked to their source rather than permanently archived. Full X Articles and entire threads are not guaranteed. This shortcut is intended for one page or post at a time.</p>
+<h2>Your shortcut tokens</h2><p>Revoke a token if a device is lost or you stop using its shortcut. Tokens expire after one year.</p>
+{% for token in tokens %}<div class="token-row">Created {{ token.created_at[:10] }} · expires {{ token.expires_at[:10] }} <button class="btn revoke" data-id="{{ token.id }}">Revoke</button></div>{% else %}<p>No active shortcut tokens yet.</p>{% endfor %}
+<p id="status" role="status"></p>
+<script src="/static/js/share-setup.js"></script></main></body></html>

@@ -1,0 +1,11 @@
+.git
+.pytest_cache
+__pycache__
+tests
+migrations
+scripts
+*.log
+.env*
+.venv
+supabase
+shortcuts
