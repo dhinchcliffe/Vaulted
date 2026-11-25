@@ -66,6 +66,17 @@ def image_links(markdown):
             yield match.start(), i + 1, url_start, url_end, url
 
 
+
+IMAGE_ERRORS = (VaultError, OSError, ValueError, http.client.HTTPException, requests.RequestException)
+
+
+def store_remote_image(url, store_image, max_bytes, deadline):
+    data, _ = safe_fetch(url, max_bytes=max_bytes, image=True, timeout=4, deadline=deadline)
+    mime = image_type(data)
+    result = store_image(base64.b64encode(data).decode('ascii'), mime)
+    return '/' + result['path'], len(data)
+
+
 def archive_images(content, store_image):
     """Store before rewriting; failed images become source links, never remote embeds."""
     replacements = []
@@ -79,13 +90,9 @@ def archive_images(content, store_image):
             try:
                 if len(cached) >= MAX_IMAGES or total >= MAX_TOTAL_BYTES or time.monotonic() >= deadline:
                     raise VaultError('Capture image/time limit reached')
-                data, _ = safe_fetch(url, max_bytes=min(MAX_IMAGE_BYTES, MAX_TOTAL_BYTES-total),
-                                     image=True, timeout=4, deadline=deadline)
-                mime = image_type(data)
-                total += len(data)
-                result = store_image(base64.b64encode(data).decode('ascii'), mime)
-                cached[url] = '/' + result['path']
-            except (VaultError, OSError, ValueError, http.client.HTTPException, requests.RequestException):
+                cached[url], size = store_remote_image(url, store_image, min(MAX_IMAGE_BYTES, MAX_TOTAL_BYTES-total), deadline)
+                total += size
+            except IMAGE_ERRORS:
                 cached[url] = None
                 # Do not expose credentials or arbitrary upstream responses in the note.
                 warnings.append('An image could not be archived; its original link is retained below.')

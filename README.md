@@ -19,3 +19,9 @@ The original cloud schema is in `migrations/001_vault.sql`. Subsequent changes a
 Desktop hosting: `baseline/desktop-last-known-good-2026-11-25`, commit `3b4a49679394feb36ce9c78134f6742a3fbfd384`. This preserves the Mac/Dropbox application and its original setup instructions.
 
 Cloud before iOS capture: `baseline/cloud-before-ios-share-2026-11-25`, commit `2f05fafa65d650e02d8ab80af0b89d84bb57d5fa`.
+
+## Archive external images on existing pages
+
+Opening or saving a page with external images shows a small banner: **Save images in Vaulted** or **Not now**. No image copying starts before you choose it. Dismissal lasts for that page in the current tab session. The page alone is inspected; no vault-wide scan or extra network request is needed for detection.
+
+The action copies images into the same private Attachments/Web archive used by shares and processes larger pages in bounded batches. You can read or navigate to another page while copying; editing the page being migrated is temporarily paused. Failed images remain unchanged and can be retried. Note revision checks protect concurrent edits, and existing version history preserves the previous content. Supported note forms include inline/reference Markdown, wiki images and HTML img/picture elements. Responsive HTML variants are replaced with one archived rendition after success. Video is not migrated.

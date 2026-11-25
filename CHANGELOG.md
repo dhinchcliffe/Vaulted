@@ -1,3 +1,11 @@
+# 2026-11-25 — migrate external images on existing pages
+
+- Baseline: baseline/before-image-migration-prompt-2026-11-25 at d36a3b8.
+- Add a dismissible page banner offering to save external images inside Vaulted. Detection runs on the already-loaded/saved page only, with no remote image downloads or vault-wide scans.
+- Reuse the capture downloader, image validation, deduplication and Attachments/Web storage. Cover Markdown images, reference images, external wiki embeds and HTML images/picture renditions; skip code examples and normal hyperlinks.
+- Process bounded batches automatically after the user clicks. Preserve failed image references for retry; keep prose, note location and revision history. Compare revisions before downloading and atomically when saving to prevent overwriting concurrent edits.
+- Allow navigation during migration; keep the page being migrated read-only and never apply its response to another page or overwrite local edits. Add backend and UI regression tests for these cases. No schema or credential changes.
+
 # 2026-11-25 — English translations for X shares
 
 - Baseline: baseline/before-x-translation-2026-11-25 at 925ad72.

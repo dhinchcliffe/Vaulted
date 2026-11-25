@@ -8,6 +8,7 @@ from vaulted.capture import fetch_web_page,html_to_markdown
 from vaulted.filing import existing_folders,resolve_folder,suggest_folder
 from vaulted.sharing import bp as sharing_bp
 from vaulted.images import archive_images
+from vaulted.external_images import external_image_count, migrate_batch
 app=Flask(__name__,static_folder='public/static',static_url_path='/static')
 install_auth(app)
 app.register_blueprint(sharing_bp)
@@ -43,12 +44,35 @@ def first():return jsonify(path=next((r['path'] for r in g.vault.rows() if r['pa
 def get_file():
     row=g.vault.get(valid_path(request.args.get('path','')))
     if row['content'] is None:raise VaultError('Not a Markdown document')
-    return jsonify(content=row['content'],path=row['path'],revision=row['revision'])
+    return jsonify(content=row['content'],path=row['path'],revision=row['revision'],
+                   external_image_count=external_image_count(row['content'],request.host_url))
 @app.post('/api/file')
 def save_file():
     d=request.get_json()
     if not isinstance(d.get('content'),str) or not isinstance(d.get('revision'),int):raise VaultError('Content and revision are required')
-    return jsonify(g.vault.save(d.get('path',''),d['content'],d['revision']))
+    result=g.vault.save(d.get('path',''),d['content'],d['revision'])
+    return jsonify(**result,external_image_count=external_image_count(d['content'],request.host_url))
+@app.post('/api/migrate-images')
+def migrate_images():
+    d=request.get_json(silent=True)
+    if not isinstance(d,dict) or type(d.get('revision')) is not int:
+        raise VaultError('Page revision is required')
+    path=valid_path(d.get('path',''))
+    skip=d.get('skip_urls',[])
+    if not isinstance(skip,list) or len(skip)>1000 or any(not isinstance(u,str) or len(u)>4096 for u in skip):
+        raise VaultError('Invalid retry state')
+    row=g.vault.get(path)
+    if row['content'] is None:raise VaultError('Choose a Markdown page')
+    if row['revision']!=d['revision']:
+        raise VaultError('This page changed. Reload it before migrating images.',409)
+    result=migrate_batch(row['content'],g.vault.store_image,request.host_url,skip)
+    revision=row['revision']
+    if result['content']!=row['content']:
+        # Atomic compare-and-swap protects edits or moves made during downloads.
+        revision=g.vault.save(path,result['content'],revision)['revision']
+    app.logger.info('image_migration migrated=%d remaining=%d',result['migrated'],result['remaining'])
+    return jsonify(success=True,path=path,revision=revision,**result)
+
 @app.get('/api/search')
 def search():
     q=request.args.get('q','').strip()[:200]

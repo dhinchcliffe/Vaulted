@@ -48,6 +48,13 @@
                     <span id="saveStatus" class="save-status"></span>
                 </div>
             </div>
+            <div id="imageMigrationBanner" class="image-migration-banner" hidden>
+                <span id="imageMigrationMessage" role="status" aria-live="polite"></span>
+                <div class="image-migration-actions">
+                    <button id="migrateImagesBtn" class="btn btn-secondary">Save images in Vaulted</button>
+                    <button id="dismissImageMigrationBtn" class="btn">Not now</button>
+                </div>
+            </div>
             <div class="editor-container">
                 <div id="preview" class="preview"></div>
                 <textarea id="editor" class="editor" style="display:none;"></textarea>
@@ -151,6 +158,7 @@
             </div>
         </main>
     </div>
+    <script src="{{ url_for('static', filename='js/image-migration.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

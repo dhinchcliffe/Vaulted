@@ -33,6 +33,21 @@ const currentFileLabel = document.getElementById('currentFile');
 const editBtn = document.getElementById('editBtn');
 const previewBtn = document.getElementById('previewBtn');
 const saveStatus = document.getElementById('saveStatus');
+const imageMigration = window.VaultedImageMigration.create({
+    banner: document.getElementById('imageMigrationBanner'),
+    message: document.getElementById('imageMigrationMessage'),
+    migrate: document.getElementById('migrateImagesBtn'),
+    dismiss: document.getElementById('dismissImageMigrationBtn'),
+    getState: () => ({path: currentFile, revision: currentRevision, dirty: editor.value !== currentContent}),
+    save: () => saveFile(),
+    apply: data => {
+        currentContent = data.content; currentRevision = data.revision;
+        editor.value = data.content; pushUndo(data.content); renderPreview(data.content);
+        saveStatus.textContent = 'Images saved'; saveStatus.className = 'save-status saved';
+    },
+    lock: busy => { editor.readOnly = busy; editBtn.disabled = busy; }
+});
+
 
 // Make file path clickable to reveal in tree
 currentFileLabel.style.cursor = 'pointer';
@@ -238,6 +253,7 @@ async function loadFile(path) {
         previewBtn.style.display = 'none';
         isEditing = false;
         updateView();
+        imageMigration.show(data.external_image_count || 0);
         
     } catch (error) {
         console.error('Failed to load file:', error);
@@ -284,6 +300,7 @@ function renderPreview(content) {
     let processedContent = content.replace(
         /!\[\[([^\]]+)\]\]/g,
         (match, imagePath) => {
+            imagePath = imagePath.split('|')[0];
             let fullPath = imagePath;
             if (!imagePath.match(/^https?:\/\//)) {
                 // Remove leading ./ if present
@@ -349,6 +366,7 @@ function updateView() {
 
 // Auto-save functionality
 function queueSave() {
+    if (imageMigration.isBusy(currentFile)) return;
     saveStatus.textContent = 'Saving...';
     saveStatus.className = 'save-status saving';
     
@@ -360,6 +378,7 @@ function queueSave() {
 
 // Save file to server
 async function saveFile() {
+    if (imageMigration.isBusy(currentFile)) return false;
     if (saveInFlight) { await saveInFlight; if (editor.value === currentContent) return true; }
     if (!currentFile || editor.value === currentContent) return true;
     const path = currentFile, content = editor.value, revision = currentRevision;
@@ -368,7 +387,10 @@ async function saveFile() {
             const response = await fetch('/api/file', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({path,content,revision}) });
             const data = await response.json();
             if (!response.ok || !data.success) throw new Error(data.error || 'Save failed');
-            if (currentFile === path) { currentContent = content; currentRevision = data.revision; }
+            if (currentFile === path) {
+                currentContent = content; currentRevision = data.revision;
+                imageMigration.show(data.external_image_count || 0);
+            }
             saveStatus.textContent = 'Saved'; saveStatus.className = 'save-status saved';
             return true;
         } catch (error) {
@@ -398,6 +420,7 @@ function pushUndo(content) {
 
 // Undo
 function undo() {
+    if (imageMigration.isBusy(currentFile)) return;
     if (undoIndex > 0) {
         undoIndex--;
         editor.value = undoStack[undoIndex];
@@ -407,6 +430,7 @@ function undo() {
 
 // Redo
 function redo() {
+    if (imageMigration.isBusy(currentFile)) return;
     if (undoIndex < undoStack.length - 1) {
         undoIndex++;
         editor.value = undoStack[undoIndex];

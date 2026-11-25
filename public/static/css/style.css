@@ -680,3 +680,11 @@ body {
     font-size: 13px;
     text-align: center;
 }
+
+/* Page-local image archive prompt; stays out of the editor and never opens a modal. */
+.image-migration-banner {display:flex;align-items:center;gap:12px;padding:10px 20px;background:#1c2734;border-bottom:1px solid #344355;color:#d4deeb;font-size:13px;flex-wrap:wrap;flex-shrink:0;}
+.image-migration-banner[hidden] {display:none;}
+.image-migration-banner > span {flex:1;min-width:200px;line-height:1.45;}
+.image-migration-actions {display:flex;gap:8px;flex-wrap:wrap;}
+.image-migration-actions [hidden] {display:none;}
+.image-migration-actions .btn {font-size:12px;}
