@@ -302,7 +302,10 @@ function renderPreview(content) {
     const renderer = new marked.Renderer();
     renderer.image = (href, title, text) => {
         // Handle protocol-relative URLs (//example.com/image.jpg -> https://example.com/image.jpg)
-        if (href && href.startsWith('//')) {
+        if (href && href.startsWith('/Attachments/Web/')) {
+            href = '/api/attachment?path=' + encodeURIComponent(href.substring(1));
+        }
+        else if (href && href.startsWith('//')) {
             href = 'https:' + href;
         }
         // Root-relative URLs (starting with /) - convert to absolute using source URL if available

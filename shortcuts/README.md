@@ -2,7 +2,7 @@
 
 Install from https://vaulted-sable.vercel.app/share/setup while signed in. Create a capture-only token, copy it, download the signed shortcut, open in Shortcuts and paste the token into its setup question. Share one Safari page or X post. Review Autofile in Vaulted and adjust the destination before File Here.
 
-Safari extraction runs in the user's visible page. Enable Allow Running Scripts in Settings → Apps → Shortcuts → Advanced if prompted. X app shares normally provide a URL: the server uses FxTwitter's public API, selecting the longer returned text and still photos only. Shared Safari content takes precedence over a shorter public excerpt. If retrieval fails, preserve supplied content and the source link with a warning. Images remain external URLs, not archival copies. Threads and X Articles are not guaranteed.
+Safari extraction runs in the user's visible page. Enable Allow Running Scripts in Settings → Apps → Shortcuts → Advanced if prompted. X app shares normally provide a URL: the server uses FxTwitter's public API, selecting the longer returned text and still photos only. Shared Safari content takes precedence over a shorter public excerpt. If retrieval fails, preserve supplied content and the source link with a warning. Images are archived inside Vaulted under Attachments/Web, deduplicated by SHA-256, and referenced from the vault root so moving the note does not break them. Failures become explicit original-source links, not remote image embeds. Threads and X Articles are not guaranteed.
 
 ## Rebuild
 
@@ -34,3 +34,9 @@ This initial release was signed using Shortcuty's documented signing service. On
 - Review links contain a file UUID, never a token. Login preserves the review path; SameSite=Lax permits incoming GET navigation while existing POST origin/header/form-CSRF protections remain.
 - Production's custom application authentication protects the vault. Vercel Standard Protection protects previews/deployment URLs while allowing the production domain to receive authenticated Shortcut requests.
 - Run `python -m pytest -q`. Run `tests/share_security.sql` against the dedicated Vaulted database as an administrator; it rolls back all test writes.
+
+## Self-contained images
+
+Capture archives PNG, JPEG, WebP, GIF and AVIF bytes in a private database table, with normal vault_files attachment metadata under Attachments/Web/<sha256>.<extension>. Image bytes are excluded from note search/tree queries and are served only after vault sign-in. This keeps the capture-only credential scoped without adding a service-role secret or public storage bucket. Root-relative Markdown image references are independent of the note folder. The database backup includes these new image bytes. Original imported attachments still use their existing private Storage bucket.
+
+Bounds: 3 MiB per image, 32 unique image URLs / 20 MiB per capture, and a 40-second image-fetch budget. Redirects and DNS are checked for public addresses, responses are size-bounded, and raster signatures are checked. Blocked, unsupported or oversized images become clearly marked original-source links. SVG and video are not imported. A token can append images only to its reserved, unfinished capture; it cannot retrieve bytes, overwrite images, or upload after finishing. Identical image bytes share one immutable attachment. SQL authorization tests are in tests/image_security.sql.

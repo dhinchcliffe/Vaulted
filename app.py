@@ -7,6 +7,7 @@ from vaulted.storage import VaultError,valid_path,build_tree
 from vaulted.capture import fetch_web_page,html_to_markdown
 from vaulted.filing import existing_folders,resolve_folder,suggest_folder
 from vaulted.sharing import bp as sharing_bp
+from vaulted.images import archive_images
 app=Flask(__name__,static_folder='public/static',static_url_path='/static')
 install_auth(app)
 app.register_blueprint(sharing_bp)
@@ -66,7 +67,7 @@ def attachment(filepath=None):
         except VaultError as e:
             if e.status in (400,404):continue
             raise
-        if row['content'] is None and row['size']>3*1024*1024:
+        if row['content'] is None and row.get('object_key') and row['size']>3*1024*1024:
             return redirect(g.vault.download_url(row))
         data=row['content'].encode() if row['content'] is not None else g.vault.download(row)
         mime=row['mime'];r=Response(data,mimetype=mime)
@@ -101,6 +102,7 @@ def paste():
     d=request.get_json();content=d.get('content','')
     if not isinstance(content,str) or not content.strip():raise VaultError('Paste some content first')
     if d.get('is_html'):content=html_to_markdown(content)
+    content,_=archive_images(content,g.vault.store_image)
     title=clean_name(re.sub(r'^#+\s*','',content.splitlines()[0])[:100] or 'Quick Paste')
     now=datetime.now(timezone.utc)
     path=create_unique('ReadItLater Inbox',f'{title} - {now.date()}.md',f'---\ncreated: {now.isoformat()}\n---\n\n[[ReadItLater]] [[Quick Paste]]\n\n{content}\n')
@@ -112,6 +114,7 @@ def capture():
     if '://' not in url:url='https://'+url
     result=fetch_web_page(url);now=datetime.now(timezone.utc)
     title=clean_name(result['title'][:100]);content=f"# [{title}]({result['url']})\n\n{result['content']}\n\nSource: {result['url']}\nSaved: {now.isoformat()}\n"
+    content,_=archive_images(content,g.vault.store_image)
     path=create_unique('ReadItLater Inbox',f'{title} - {now.date()}.md',content)
     return jsonify(success=True,path=path,title=title)
 @app.post('/api/rename')

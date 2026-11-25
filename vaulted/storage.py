@@ -1,5 +1,5 @@
 """User-scoped Supabase repository. No privileged key is used by the web app."""
-import os,posixpath
+import os,posixpath,base64
 import requests
 from urllib.parse import quote
 
@@ -46,7 +46,12 @@ class SupabaseVault:
         return self.call('POST','/rest/v1/rpc/vault_move',json={'p_from':valid_path(source),'p_to':valid_path(target)}).json()
     def search(self,query):
         return self.call('POST','/rest/v1/rpc/vault_search',json={'p_query':query}).json()
+    def store_image(self,data,mime):
+        return self.call('POST','/rest/v1/rpc/vault_store_image',json={'p_data':data,'p_mime':mime}).json()
     def download(self,row):
+        if not row.get('object_key'):
+            result=self.call('POST','/rest/v1/rpc/vault_read_image',json={'p_id':row['id']}).json()
+            return base64.b64decode(result['data'])
         r=self.call('GET','/storage/v1/object/authenticated/vault-original/'+quote(row['object_key'],safe='/'))
         return r.content
     def download_url(self,row):

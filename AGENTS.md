@@ -8,4 +8,4 @@
 - Run relevant regression/security tests, update CHANGELOG.md, and commit all source. Never commit credentials, tokens, research contents or environment files.
 - Share tokens only permit new Inbox captures. Browser sign-in and membership checks remain required for reading, editing, Autofile and moves.
 - Shortcut templates must contain no credentials. Sign the generic template before distribution; configure tokens on the user's device.
-- Preserve complete source text and source URL. Flag failed/incomplete capture. Still images may be linked; do not import video.
+- Preserve complete source text and source URL. Flag failed/incomplete capture. Archive captured images in Attachments/Web with stable vault-root references; do not import video. Keep image bytes inside the vault and make any archival failure explicit.

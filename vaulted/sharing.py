@@ -5,6 +5,7 @@ import uuid
 from flask import Blueprint, request, jsonify, g, render_template, current_app
 from .storage import SupabaseVault, VaultError
 from .share_content import normalize_payload, build_note
+from .images import archive_images
 
 bp = Blueprint('sharing', __name__)
 PUBLIC_ORIGIN = 'https://vaulted-sable.vercel.app'
@@ -61,7 +62,9 @@ def capture():
         result = claim
     else:
         note = build_note(payload)
-        warnings = note['warnings']
+        note['content'], image_warnings = archive_images(note['content'], lambda data, mime:
+            capture_rpc('vault_share_image', p_token=token, p_request=request_id, p_data=data, p_mime=mime))
+        warnings = note['warnings'] + image_warnings
         result = capture_rpc('vault_share_finish', p_token=token, p_request=request_id,
                              p_title=note['title'], p_content=note['content'])
     current_app.logger.info('share_capture saved request=%s file=%s warnings=%d', request_id, result['file_id'], len(warnings))
