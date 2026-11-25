@@ -525,6 +525,7 @@ function setupEventListeners() {
     
     // Keyboard shortcuts
     editor.addEventListener('keydown', (e) => {
+        if (imageMigration.isBusy(currentFile)) return;
         if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
             e.preventDefault();
             if (e.shiftKey) {
