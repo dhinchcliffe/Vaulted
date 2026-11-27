@@ -1,5 +1,6 @@
 """Normalize share-sheet captures; public X enrichment is best effort, never video."""
 import json
+import http.client
 import re
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, urljoin
@@ -9,6 +10,7 @@ from bs4 import BeautifulSoup
 
 from .capture import fetch_web_page, html_to_markdown
 from .storage import VaultError
+from .reddit import reddit_url, fetch_reddit_post
 from .translation import translate_x_text, plain_markdown
 
 MAX_TEXT = 700_000
@@ -115,11 +117,11 @@ def normalize_payload(data):
     url = payload.get('url', '')
     if not url:
         urls = re.findall(r'https?://[^\s<>"\uFFFC]+', text)
-        url = next((u for u in urls if x_post_id(u)), urls[0] if urls else '')
+        url = next((u for u in urls if x_post_id(u) or reddit_url(u)), urls[0] if urls else '')
     if url:
         payload['url'] = public_url(url)
     if not url and not text.strip() and not payload.get('html', '').strip():
-        raise VaultError('Share a webpage, X post link or selected text')
+        raise VaultError('Share a webpage, Reddit or X post link, or selected text')
     return payload
 
 
@@ -173,6 +175,36 @@ def build_note(payload):
             elif translation_warning:
                 warnings.append(translation_warning)
         url = canonical
+    elif url and reddit_url(url):
+        try:
+            post = fetch_reddit_post(url)
+            title = post['title']
+            # Keep Safari's richer selection alongside the structured post rather
+            # than silently replacing either source. Native shares usually only carry a URL.
+            supplied = body if body and body != url else ''
+            body = post['text']
+            if supplied and supplied.strip() not in (body.strip(), title.strip()) and supplied.strip() not in body:
+                body += '\n\n## Shared content\n\n' + supplied
+            body += '\n\n' + '\n\n'.join(post['photos'])
+            body = ('Posted by ' + plain_markdown(post['author']) + ' in r/'
+                    + plain_markdown(post['subreddit']) + '\n\n' + body)
+            url = post['url']
+            method = 'Public Reddit post'
+            if post['video']:
+                warnings.append('This post contains video. Video was not imported.')
+            if post['article_url']:
+                article_url = public_url(post['article_url'])
+                body += '\n\nArticle source: ' + article_url
+                try:
+                    article = fetch_web_page(article_url)
+                    body += '\n\n## Linked article\n\n' + article['content']
+                except (VaultError, OSError, ValueError, requests.RequestException, http.client.HTTPException):
+                    warnings.append('The linked article could not be retrieved. Its source URL was kept.')
+        except (requests.RequestException, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            warnings.append('Reddit retrieval was unavailable. Shared content was kept. Open the post in Safari and share its visible content or selected text if needed.')
+            if not body or body == url:
+                body = 'Post content could not be retrieved. The source link is saved for follow-up.'
+                title = title or 'Reddit post'
     elif url and not html and (not text or text == url):
         try:
             page = fetch_web_page(url)

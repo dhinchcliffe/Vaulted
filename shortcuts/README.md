@@ -48,3 +48,11 @@ New foreign-language X captures put an explicitly labeled English translation fi
 Use FxTwitter’s /status/<id>/en translation when it accompanies the exact same complete original and targets English. Fall back to the existing OpenRouter connection (OPENROUTER_API_KEY; optional OPENROUTER_TRANSLATION_MODEL, default openai/gpt-4o-mini). Known-English posts skip both translation calls. Unknown-language or fuller shared Safari text is detected/translated by AI. The model receives only the selected source text, never credentials or other vault records. Generated text is rendered literally and cannot introduce image embeds.
 
 AI translation handles at most 40,000 characters in 6,000-character chunks, with a 55-second total time budget and no retries. Non-stop/truncated responses and incomplete chunks are rejected as a whole. Translation failure or size limits preserve the original with a visible notice. Image archival and editable Autofile remain unchanged. Existing notes are not rewritten automatically.
+
+## Reddit captures
+
+Use the existing Save to Vaulted Shortcut from Reddit's Share menu or Safari. No reinstall is required. Public post URLs, redd.it short URLs, /s/ app-share links and galleries are recognized server-side. Capture preserves title, complete returned post Markdown, author/subreddit and canonical Reddit source; linked article posts also attempt the destination article and keep its URL. Galleries and inline Reddit images use the existing private Attachments/Web archival. Autofile remains editable before final placement.
+
+Retrieval makes bounded public Reddit requests without cookies or an OAuth account. Reddit can deny automated requests, especially from hosted servers; private, deleted, age-gated or otherwise inaccessible posts are not bypassed. If denied, preserve shared Safari content and flag the capture as incomplete. Open the post in Safari and share visible content/selected text as the fallback. No comments or video are imported. This does not add Reddit translation.
+
+Regression coverage: tests/test_reddit.py (post URLs, native shortlink redirects, redirect boundary, full text, galleries, inline images, source URLs, blocked/deleted posts, linked articles and video omission), plus existing capture/storage/security tests.

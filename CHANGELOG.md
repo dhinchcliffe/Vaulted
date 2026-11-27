@@ -1,3 +1,10 @@
+# 2026-11-28 — Reddit iOS share capture
+
+- Existing Save to Vaulted Shortcut now recognizes Reddit posts, galleries, redd.it and native-app /s/ share links. No Shortcut reinstall or new credentials.
+- Preserve full public post text, title, source URL and ordered still-image galleries; resolve inline Reddit image IDs. Linked article posts include the article when accessible and keep both sources. Reuse existing private image archival and editable Autofile review. No comments or video imports.
+- Bound public retrieval, validate post identity, restrict shortlink redirects to Reddit hosts, and retain Safari-shared content with an explicit warning when Reddit denies access. Restricted/deleted posts and linked-article failures never silently count as complete captures.
+- No schema, authentication or layout changes. Recovery point: `baseline/before-reddit-capture-2026-11-28` at `7d1c7ed`.
+
 # 2026-11-27 — keep renamed pages visible and editable
 
 - Rename edits the title of a Markdown page. The server preserves the lowercase .md suffix, including for older clients. Folder names retain their original semantics, and the existing move operation rejects occupied destinations.
