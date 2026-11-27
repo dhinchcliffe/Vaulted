@@ -1,3 +1,10 @@
+# 2026-11-27 — phone navigation and touch tree menus
+
+- On narrow touch screens, Browse opens the existing vault tree and search over the full-width editor. Edit or Preview stays on the toolbar. More contains Paste, Web, Auto-File and a remembered full-layout option. Dismissing Browse preserves the draft and reading position. A failed save keeps the drawer open and reports the conflict.
+- Tap a physical row's ellipsis or hold its label to open the existing actions. Folders support Add Page and Rename. Pages support Rename. Scrolling cancels a hold. Recently used entries continue to link to their originals.
+- The compact presentation is in `phone-layout.css` and `phone-layout.js`. Full-size iPad and desktop use the existing layout. Browser tests use synthetic notes for touch gestures, creation and renaming, search, rotation, layout preferences, share review and edit conflicts.
+- Recovery point: `baseline/before-phone-layout-2026-11-27` at `13b6bc5`, the production version with the 100-page history.
+
 # 2026-11-27 — longer recent page history
 
 - Raised the browser's recently used page limit from 10 to 100. Existing entries carry over and new visits fill the remaining slots.

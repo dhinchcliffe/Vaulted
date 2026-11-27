@@ -1,0 +1,115 @@
+.phone-size:not(.phone-layout) #restorePhone {
+    display: block;
+    position: fixed;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 8px;
+    min-height: 44px;
+    z-index: 90;
+}
+
+body.phone-layout .app { height: 100dvh; }
+body.phone-layout .content { min-width: 0; width: 100%; }
+body.phone-layout .toolbar {
+    position: relative;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 4px 6px;
+    padding: 4px max(8px, env(safe-area-inset-right)) 4px max(8px, env(safe-area-inset-left));
+}
+body.phone-layout .toolbar-actions { display: contents; }
+body.phone-layout #currentFile {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.phone-layout .btn.phone-only { display: inline-block; }
+.phone-layout .toolbar .btn, .phone-layout .drawer-controls .btn {
+    min-height: 44px;
+    padding: 6px 12px;
+    font-size: 14px;
+}
+.phone-layout .shortcut-hint, .phone-layout #searchBtn { display: none; }
+.phone-layout .save-status:not(:empty) {
+    flex-basis: 100%;
+    text-align: start;
+    overflow-wrap: anywhere;
+}
+.phone-layout .save-status:empty { display: none; }
+.phone-layout #secondaryActions {
+    display: none;
+    position: absolute;
+    z-index: 50;
+    right: max(8px, env(safe-area-inset-right));
+    top: 100%;
+    padding: 4px;
+    min-width: 11rem;
+    max-height: 75dvh;
+    overflow-y: auto;
+    border: 1px solid #454549;
+    border-radius: 6px;
+    background: #2d2d2d;
+    box-shadow: 0 4px 12px #0008;
+}
+.phone-layout.more-open #secondaryActions { display: grid; }
+.phone-layout #secondaryActions .btn { text-align: left; background: transparent; color: #eee; }
+.phone-layout #secondaryActions .btn:focus-visible,
+.phone-layout #secondaryActions .btn:hover { background: #3c3c3c; }
+.phone-layout #useFull { border-top: 1px solid #454549; }
+
+body.phone-layout .sidebar {
+    display: none;
+    position: fixed;
+    inset: 0 auto auto 0;
+    height: 100dvh;
+    width: min(360px, calc(100% - 44px));
+    z-index: 110;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
+    box-shadow: 6px 0 24px #0006;
+}
+body.phone-layout.drawer-open .sidebar { display: flex; }
+.phone-layout.drawer-open #drawerBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: #0008;
+}
+.phone-layout .drawer-controls {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+}
+.phone-layout #drawerStatus:not(:empty) { display: block; color: #f2b4ae; margin-top: 6px; }
+.phone-layout .tree, .phone-layout .search-panel { min-height: 0; overscroll-behavior: contain; }
+.phone-layout .search-panel { flex: 1; }
+.phone-layout .search-results { max-height: none; }
+.phone-layout .search-input { min-width: 0; font-size: 16px; }
+.phone-layout .tree-item { min-height: 44px; font-size: 15px; }
+.phone-layout .tree-item[data-path] {
+    padding: 0 4px 0 12px !important; /* Depth is already indented by .tree-children. */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: pan-y pinch-zoom;
+}
+.phone-layout .tree-item[data-path] > span:nth-child(2) { overflow-wrap: anywhere; min-width: 0; }
+.phone-layout .node-actions {
+    display: block;
+    flex: 0 0 44px;
+    height: 44px;
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: #b5c3bb;
+    font-size: 22px;
+    cursor: pointer;
+}
+.phone-layout .context-menu-item { min-height: 44px; padding: 12px 18px; }
+.phone-layout .editor-container { min-height: 0; min-width: 0; }
+body.phone-layout .preview, .phone-layout .editor { padding: 16px; overflow-wrap: anywhere; }
+.phone-layout .editor { font-size: 16px; }
+.phone-layout .preview img { max-width: 100%; height: auto; }
+.phone-layout .preview table { display: block; overflow-x: auto; }
+body.phone-layout .modal-content { max-height: 90dvh; overflow-y: auto; }
