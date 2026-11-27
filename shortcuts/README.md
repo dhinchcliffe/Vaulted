@@ -56,3 +56,19 @@ Use the existing Save to Vaulted Shortcut from Reddit's Share menu or Safari. No
 Retrieval makes bounded public Reddit requests without cookies or an OAuth account. Reddit can deny automated requests, especially from hosted servers; private, deleted, age-gated or otherwise inaccessible posts are not bypassed. If denied, preserve shared Safari content and flag the capture as incomplete. Open the post in Safari and share visible content/selected text as the fallback. No comments or video are imported. This does not add Reddit translation.
 
 Regression coverage: tests/test_reddit.py (post URLs, native shortlink redirects, redirect boundary, full text, galleries, inline images, source URLs, blocked/deleted posts, linked articles and video omission), plus existing capture/storage/security tests.
+
+## Isolated Reddit on-phone experiment
+
+Install **Reddit to Vaulted Test** from /share/setup#reddit-test with a capture token. Keep the existing Save to Vaulted shortcut. Start in Reddit → Share → More → Reddit to Vaulted Test. Allow Reddit/Vaulted network access if asked. This experiment requests Reddit public post data on the phone, then sends serialized JSON plus the canonical source URL to Vaulted. It has no automatic Safari fallback. Reddit may still deny access or iOS may stop on a networking error; report the exact error, not merely that the capture failed.
+
+Normal post IDs are extracted without a network call; app /s/ links use Expand URL on the phone first. The only Reddit content request is GET https://www.reddit.com/api/info.json?id=t3_<id>&raw_json=1. The capture token is used solely for the POST to Vaulted. Vaulted enforces the existing one-megabyte input bound, validates identity, skips server Reddit retrieval, rejects error pages before saving, and reuses the existing image/Autofile path. Linked external articles and image bytes are still fetched by Vaulted, with existing failure notices. No Reddit session or OAuth credentials are requested or forwarded.
+
+Build with Cherri v2.4.0:
+
+```sh
+cherri shortcuts/reddit-phone-test.cherri --skip-sign --derive-uuids
+python shortcuts/finalize_reddit_shortcut.py
+shortcuts sign --mode anyone --input shortcuts/Reddit-to-Vaulted-Test.unsigned.shortcut --output public/static/shortcuts/Reddit-to-Vaulted-Test.shortcut
+```
+
+The finalizer adds the import question, workflow name and distinct deterministic conditional groups. The public credential-free template was signed through the same Shortcuty signing API used for the original template; hashes are in reddit-test-signing-manifest.json. No user content or tokens go to the signer. Keep both source and unsigned/signed artifacts in Git. Do not promote this experiment to the normal Shortcut until a real iPhone capture succeeds.

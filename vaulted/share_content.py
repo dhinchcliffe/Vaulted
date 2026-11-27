@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 
 from .capture import fetch_web_page, html_to_markdown
 from .storage import VaultError
-from .reddit import reddit_url, fetch_reddit_post
+from .reddit import reddit_url, fetch_reddit_post, parse_reddit_post, post_id as reddit_post_id
 from .translation import translate_x_text, plain_markdown
 
 MAX_TEXT = 700_000
@@ -108,10 +108,10 @@ def normalize_payload(data):
         payload = decoded if isinstance(decoded, dict) else {'text': payload}
     if not isinstance(payload, dict):
         raise VaultError('Unsupported shared content')
-    for key in ('url', 'title', 'text', 'html'):
+    for key in ('url', 'title', 'text', 'html', 'reddit_json'):
         if key in payload and not isinstance(payload[key], str):
             raise VaultError('Invalid shared ' + key)
-    if sum(len(payload.get(k, '').encode()) for k in ('url', 'title', 'text', 'html')) > 1_000_000:
+    if sum(len(payload.get(k, '').encode()) for k in ('url', 'title', 'text', 'html', 'reddit_json')) > 1_000_000:
         raise VaultError('Shared page is too large. Share a selection instead.', 413)
     text = payload.get('text', '')
     url = payload.get('url', '')
@@ -120,6 +120,8 @@ def normalize_payload(data):
         url = next((u for u in urls if x_post_id(u) or reddit_url(u)), urls[0] if urls else '')
     if url:
         payload['url'] = public_url(url)
+    if 'reddit_json' in payload and not reddit_post_id(url):
+        raise VaultError('Phone capture requires a Reddit post URL', 422)
     if not url and not text.strip() and not payload.get('html', '').strip():
         raise VaultError('Share a webpage, Reddit or X post link, or selected text')
     return payload
@@ -177,7 +179,10 @@ def build_note(payload):
         url = canonical
     elif url and reddit_url(url):
         try:
-            post = fetch_reddit_post(url)
+            if 'reddit_json' in payload:
+                post = parse_reddit_post(json.loads(payload['reddit_json']), reddit_post_id(url))
+            else:
+                post = fetch_reddit_post(url)
             title = post['title']
             # Keep Safari's richer selection alongside the structured post rather
             # than silently replacing either source. Native shares usually only carry a URL.
@@ -189,7 +194,7 @@ def build_note(payload):
             body = ('Posted by ' + plain_markdown(post['author']) + ' in r/'
                     + plain_markdown(post['subreddit']) + '\n\n' + body)
             url = post['url']
-            method = 'Public Reddit post'
+            method = 'Reddit post fetched on iPhone' if 'reddit_json' in payload else 'Public Reddit post'
             if post['video']:
                 warnings.append('This post contains video. Video was not imported.')
             if post['article_url']:
@@ -201,6 +206,8 @@ def build_note(payload):
                 except (VaultError, OSError, ValueError, requests.RequestException, http.client.HTTPException):
                     warnings.append('The linked article could not be retrieved. Its source URL was kept.')
         except (requests.RequestException, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            if 'reddit_json' in payload:
+                raise VaultError('Reddit did not return a readable post to the phone. Nothing was saved. Please report the error from this test; your original Shortcut is unchanged.', 422)
             warnings.append('Reddit retrieval was unavailable. Shared content was kept. Open the post in Safari and share its visible content or selected text if needed.')
             if not body or body == url:
                 body = 'Post content could not be retrieved. The source link is saved for follow-up.'

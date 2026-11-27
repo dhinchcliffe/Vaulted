@@ -89,6 +89,13 @@ def fetch_reddit_post(url):
         payload = json.loads(data)
     finally:
         response.close()
+    return parse_reddit_post(payload, identifier)
+
+
+def parse_reddit_post(payload, identifier):
+    """Parse fetched or phone-supplied data; identity must match the source URL."""
+    if not identifier:
+        raise ValueError('A canonical Reddit post URL is required')
     listing = payload[0] if isinstance(payload, list) and payload else payload
     children = listing['data']['children']
     post = next((item['data'] for item in children

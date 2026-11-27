@@ -1,0 +1,43 @@
+#include 'actions/web'
+#include 'actions/crypto'
+#include 'actions/text'
+#define name Reddit to Vaulted Test
+#define color orange
+#define glyph folder
+#define inputs url, text
+#define from sharesheet
+const token = text("PASTE_TOKEN_HERE")
+const sharedText = text("{ShortcutInput}")
+const links = matchText('(?i)https?://(?:(?:www|old|new|np|m|sh)[.])?(?:reddit[.]com|redd[.]it)/[^\s<>]+', sharedText)
+if !links {
+    alert("Share one public Reddit post from the Reddit app to this test shortcut.", "Reddit phone test")
+    stop()
+}
+@postURL = getFirstItem(links)
+@matches = matchText('(?i)^https?://(?:(?:(?:www|old|new|np|m|sh)[.])?reddit[.]com/(?:r/[^/]+/)?(?:comments|gallery)/|(?:www[.])?redd[.]it/)([a-z0-9]+)(?:[/?#]|$)', "{@postURL}")
+if !@matches {
+    @postURL = expandURL("{@postURL}")
+    @matches = matchText('(?i)^https?://(?:(?:(?:www|old|new|np|m|sh)[.])?reddit[.]com/(?:r/[^/]+/)?(?:comments|gallery)/|(?:www[.])?redd[.]it/)([a-z0-9]+)(?:[/?#]|$)', "{@postURL}")
+}
+if !@matches {
+    alert("Reddit did not resolve this share link to a post. Nothing was saved. Please report this message.", "Reddit phone test")
+    stop()
+}
+const identifier = getMatchGroup(@matches, 1)
+const postId = getFirstItem(identifier)
+// This GET runs on the iPhone. No Vaulted token or Reddit credentials are sent to Reddit.
+const downloaded = downloadURL("https://www.reddit.com/api/info.json?id=t3_{postId}&raw_json=1", {"Accept": "application/json", "User-Agent": "Vaulted/1.3 personal research capture"})
+const redditJSON = getText(downloaded)
+const random1 = randomNumber(0, 2147483647)
+const random2 = randomNumber(0, 2147483647)
+const requestSeed = text("{random1}:{random2}:{postId}")
+const requestId = hash(requestSeed, "MD5")
+const response = jsonRequest("https://vaulted-sable.vercel.app/api/share/capture", "POST", {"url": "https://www.reddit.com/comments/{postId}/", "reddit_json": "{redditJSON}", "request_id": "{requestId}"}, {"Authorization": "Bearer {token}"})
+const result = getDictionary(response)
+const reviewURL = getValue(result, "review_url")
+if reviewURL {
+    openURL("{reviewURL}")
+} else {
+    const errorMessage = getValue(result, "error")
+    alert("{errorMessage}", "Reddit phone test — nothing saved")
+}

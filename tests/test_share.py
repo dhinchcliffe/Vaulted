@@ -141,3 +141,17 @@ def test_login_rejects_external_review_redirect(client, monkeypatch, next_path):
     with client.session_transaction() as s: s['csrf_token'] = 'csrf'
     r = client.post('/login', query_string={'next': next_path}, data={'csrf_token': 'csrf'})
     assert r.status_code == 302 and r.location == '/'
+
+
+def test_blocked_phone_capture_never_saves_note(client, monkeypatch):
+    from vaulted import sharing
+    rpc = Mock(return_value={'file_id': None})
+    monkeypatch.setattr(sharing, 'capture_rpc', rpc)
+    r = client.post('/api/share/capture', json={
+        'url': 'https://www.reddit.com/comments/144ph0m/',
+        'reddit_json': '<html>Blocked by network security</html>'},
+        headers={'Authorization': 'Bearer ' + 'a'*43})
+    assert r.status_code == 422
+    assert 'Nothing was saved' in r.json['error']
+    assert rpc.call_count == 1
+    assert rpc.call_args.args[0] == 'vault_share_claim'

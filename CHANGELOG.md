@@ -1,3 +1,11 @@
+# 2026-11-28 — isolated Reddit on-phone capture experiment
+
+- Add a separately named, signed Reddit to Vaulted Test Shortcut. The existing signed Save to Vaulted file and workflow are unchanged. Preserve baseline/before-reddit-phone-fetch-2026-11-28 at 86b2f8b.
+- Resolve Reddit app short links on the phone as needed and request public post data from the phone through Reddit's info endpoint. No Vaulted token is sent to Reddit. No Safari fallback or new third-party runtime service is added.
+- Accept bounded phone-supplied Reddit JSON in the existing authenticated capture pipeline; match the post ID to the source URL and reuse post parsing, private image archival and editable Autofile. Skip the server Reddit lookup for these captures. Reject block pages, malformed/empty data and mismatched posts without saving a note.
+- Validation: 124 tests passed; three unrelated browser suites skipped without Playwright. Shortcut URL patterns, token isolation, block-response rejection and source identity are covered.
+- Add experiment installation instructions and reproducible source/signing metadata. Compilation and backend tests do not establish whether Reddit permits the user's iPhone; a real-device trial is required before promoting this into the standard Shortcut.
+
 # 2026-11-28 — Reddit iOS share capture
 
 - Existing Save to Vaulted Shortcut now recognizes Reddit posts, galleries, redd.it and native-app /s/ share links. No Shortcut reinstall or new credentials.

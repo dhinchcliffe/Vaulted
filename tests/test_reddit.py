@@ -121,3 +121,67 @@ def test_inline_image_ids_become_archivable_urls(monkeypatch):
     note = sc.build_note({'url': 'https://redd.it/144ph0m'})
     assert '![img](<https://i.redd.it/abc123.jpg>)' in note['content']
     assert 'Full conclusion' in note['content']
+
+
+def phone_payload(**post):
+    data = {'id': '144ph0m', 'title': 'Phone fetched post', 'selftext': 'Full phone text\n'*1000,
+            'is_self': True, 'author': 'writer', 'subreddit': 'research', **post}
+    return {'url': 'https://www.reddit.com/comments/144ph0m/',
+            'reddit_json': json.dumps({'data': {'children': [{'kind': 't3', 'data': data}]}})}
+
+
+def test_phone_data_bypasses_server_reddit_fetch(monkeypatch):
+    fetch = Mock(side_effect=AssertionError('Must not refetch Reddit'))
+    monkeypatch.setattr(sc, 'fetch_reddit_post', fetch)
+    note = sc.build_note(sc.normalize_payload(phone_payload()))
+    assert ('Full phone text\n'*1000).strip() in note['content']
+    assert 'Source: https://www.reddit.com/comments/144ph0m/' in note['content']
+    assert 'Capture method: Reddit post fetched on iPhone' in note['content']
+    assert not note['warnings']
+    fetch.assert_not_called()
+
+
+@pytest.mark.parametrize('raw', ['<html>Blocked by network security</html>', '{"error":403}',
+    '{}', 'null', '[]', '{"data":{"children":[]}}'])
+def test_phone_block_pages_and_empty_data_rejected(raw):
+    from vaulted.storage import VaultError
+    payload = phone_payload()
+    payload['reddit_json'] = raw
+    with pytest.raises(VaultError, match='Nothing was saved'):
+        sc.build_note(sc.normalize_payload(payload))
+
+
+def test_phone_post_id_must_match_source():
+    from vaulted.storage import VaultError
+    with pytest.raises(VaultError): sc.build_note(phone_payload(id='different'))
+
+
+@pytest.mark.parametrize('payload', [
+    {'url': 'https://example.org/', 'reddit_json': '{}'},
+    {'url': 'https://redd.it/144ph0m', 'reddit_json': {}},
+    {'url': 'https://redd.it/144ph0m', 'reddit_json': 'x'*1_000_001}])
+def test_phone_input_limits(payload):
+    from vaulted.storage import VaultError
+    with pytest.raises(VaultError): sc.normalize_payload(payload)
+
+
+def test_test_shortcut_get_is_credential_free_and_patterns_work():
+    import plistlib
+    import re
+    from pathlib import Path
+    workflow = plistlib.loads(Path('shortcuts/Reddit-to-Vaulted-Test.unsigned.shortcut').read_bytes())
+    actions = workflow['WFWorkflowActions']
+    downloads = [a['WFWorkflowActionParameters'] for a in actions if a['WFWorkflowActionIdentifier'].endswith('.downloadurl')]
+    assert len(downloads) == 2
+    assert downloads[0]['WFHTTPMethod'] == 'GET'
+    assert 'https://www.reddit.com/api/info.json' in downloads[0]['WFURL']['Value']['string']
+    assert 'Authorization' not in json.dumps(downloads[0])
+    assert downloads[1]['WFURL'] == 'https://vaulted-sable.vercel.app/api/share/capture'
+    assert 'reddit_json' in json.dumps(downloads[1])
+    patterns = [a['WFWorkflowActionParameters']['WFMatchTextPattern'] for a in actions if a['WFWorkflowActionIdentifier'].endswith('.text.match')]
+    assert re.search(patterns[0], 'Title https://www.reddit.com/r/example/s/abcdef More').group(0) == 'https://www.reddit.com/r/example/s/abcdef'
+    for url in ['https://www.reddit.com/r/example/comments/144ph0m/title', 'https://redd.it/144ph0m?share=1', 'https://reddit.com/gallery/144ph0m']:
+        assert re.search(patterns[1], url).group(1) == '144ph0m'
+    assert not re.search(patterns[1], 'https://reddit.com.evil.test/comments/144ph0m')
+    assert workflow['WFWorkflowImportQuestions'][0]['ActionIndex'] == 0
+    assert actions[0]['WFWorkflowActionParameters']['WFTextActionText'] == 'PASTE_TOKEN_HERE'
