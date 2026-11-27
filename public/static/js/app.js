@@ -54,10 +54,19 @@ const imageMigration = window.VaultedImageMigration.create({
 });
 
 
-// Make file path clickable to reveal in tree
+// Keep the ordinary vault available while a cached shell or optional phone asset catches up.
+const phoneLayout = document.getElementById('browseBtn') && window.createPhoneLayout?.({
+    readPreference, writePreference, openSearch, openTreeMenu,
+    refreshTitle: () => displayCurrentPath(currentFile)
+});
 currentFileLabel.style.cursor = 'pointer';
 currentFileLabel.title = 'Click to reveal in tree';
 currentFileLabel.addEventListener('click', revealCurrentFileInTree);
+
+function displayCurrentPath(path) {
+    if (path) currentFileLabel.textContent = document.body.classList.contains('phone-layout')
+        ? path.slice(path.lastIndexOf('/') + 1) : path;
+}
 
 // Browser preferences are optional. The editor also works when storage is unavailable.
 function readPreference(key) {
@@ -220,6 +229,7 @@ function renderTree(items, container, level = 0, savedExpanded = null) {
             setupTreeItemContextMenu(div, item.path, 'file');
         }
         
+        phoneLayout?.addNodeAction(div);
         container.appendChild(div);
         
         if (item.type === 'directory' && item.children) {
@@ -286,7 +296,10 @@ async function loadFile(path, recentId = null) {
     switchingFile = true;
     clearTimeout(saveTimeout);
     try {
-        if (currentFile && editor.value !== currentContent && !await saveFile()) return;
+        if (currentFile && editor.value !== currentContent && !await saveFile()) {
+            phoneLayout?.navigationError(saveStatus.textContent);
+            return;
+        }
         const query = recentId ? {id: recentId} : {path};
         const response = await fetch('/api/file?' + new URLSearchParams(query));
         const data = await response.json();
@@ -297,6 +310,7 @@ async function loadFile(path, recentId = null) {
                 renderRecentPages();
             }
             saveStatus.textContent = data.error;
+            phoneLayout?.navigationError(data.error);
             console.error('Error loading file:', data.error);
             return;
         }
@@ -308,7 +322,7 @@ async function loadFile(path, recentId = null) {
         currentRevision = data.revision;
         
         // Update UI
-        currentFileLabel.textContent = path;
+        displayCurrentPath(path);
         editor.value = currentContent;
         renderPreview(currentContent);
         
@@ -341,8 +355,10 @@ async function loadFile(path, recentId = null) {
             renderRecentPages();
         }
         if (pathChanged) await loadFileTree();
+        phoneLayout?.closeDrawer();
         
     } catch (error) {
+        phoneLayout?.navigationError('Could not open the page. Try again.');
         console.error('Failed to load file:', error);
     } finally { switchingFile = false; }
 }
@@ -973,6 +989,11 @@ function highlightTreeItem(path) {
 // Reveal current file in tree view
 function revealCurrentFileInTree() {
     if (!currentFile) return;
+    phoneLayout?.openDrawer();
+    if (document.body.classList.contains('phone-layout') && isSearchActive) {
+        closeSearch(); // Reveals and scrolls to the physical tree item.
+        return;
+    }
 
     // Get all path components except the filename
     const pathParts = currentFile.split('/');
@@ -1014,9 +1035,7 @@ function revealCurrentFileInTree() {
 let contextMenuTarget = null;
 
 // Show context menu
-function showContextMenu(e, path, type) {
-    e.preventDefault();
-    e.stopPropagation();
+function openTreeMenu(path, type, x, y) {
     contextMenuTarget = { path, type };
 
     const menu = document.getElementById('contextMenu');
@@ -1030,22 +1049,26 @@ function showContextMenu(e, path, type) {
     }
 
     menu.style.display = 'block';
-    menu.style.left = `${e.clientX}px`;
-    menu.style.top = `${e.clientY}px`;
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
 
     // Ensure menu stays within viewport
     const rect = menu.getBoundingClientRect();
     if (rect.right > window.innerWidth) {
-        menu.style.left = `${e.clientX - rect.width}px`;
+        menu.style.left = `${Math.max(0, x - rect.width)}px`;
     }
     if (rect.bottom > window.innerHeight) {
-        menu.style.top = `${e.clientY - rect.height}px`;
+        menu.style.top = `${Math.max(0, y - rect.height)}px`;
     }
 }
 
 // Setup context menu on tree items
 function setupTreeItemContextMenu(element, path, type) {
-    element.addEventListener('contextmenu', (e) => showContextMenu(e, path, type));
+    element.addEventListener('contextmenu', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        openTreeMenu(path, type, event.clientX, event.clientY);
+    });
 }
 
 // Rename modal functions
@@ -1106,7 +1129,7 @@ async function confirmRename() {
             if (currentFile === oldPath || (currentFile && currentFile.startsWith(oldPath + '/'))) {
                 currentFile = newPath + currentFile.slice(oldPath.length);
                 writePreference('vaulted_lastFile', currentFile);
-                currentFileLabel.textContent = currentFile;
+                displayCurrentPath(currentFile);
             }
             await loadFileTree();
             // Highlight and scroll to the renamed item
@@ -1286,6 +1309,7 @@ let lastSearchQuery = '';
 
 // Open search panel
 function openSearch() {
+    phoneLayout?.openDrawer();
     const searchPanel = document.getElementById('searchPanel');
     const fileTree = document.getElementById('fileTree');
     const searchInput = document.getElementById('searchInput');

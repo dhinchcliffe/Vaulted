@@ -5,18 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vaulted</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/phone-layout.css') }}">
     <script src="/static/vendor/marked.min.js"></script>
     <script src="/static/vendor/purify.min.js"></script>
 </head>
 <body{% if capture_path %} data-capture-path="{{ capture_path }}"{% endif %}>
     <div class="app">
-        <aside class="sidebar">
+        <aside class="sidebar" id="vaultSidebar" aria-label="Vault navigation">
             <div class="sidebar-header">
                 <h1>Vaulted</h1><a href="/account" style="color:#aeb8c9;font-size:12px">Account / sign out</a><a href="/share/setup" style="color:#aeb8c9;font-size:12px">Save from iPhone</a>
                 <div class="vault-status" id="vaultStatus">
                     <span class="status-dot" id="statusDot"></span>
                     <span class="status-text" id="statusText">Loading...</span>
                 </div>
+                <div class="phone-only drawer-controls">
+                    <button type="button" class="btn btn-secondary" id="drawerSearch">Search</button>
+                    <button type="button" class="btn btn-secondary" id="closeDrawer">Close</button>
+                </div>
+                <div class="phone-only" id="drawerStatus" role="status"></div>
             </div>
             
             <!-- Search Panel (hidden by default) -->
@@ -38,17 +44,24 @@
                 <div id="physicalTree"><div class="loading">Loading vault...</div></div>
             </div>
         </aside>
+        <div class="phone-only" id="drawerBackdrop"></div>
+        <button type="button" class="btn" id="restorePhone">Use phone layout</button>
         <main class="content">
             <div class="toolbar">
+                <button type="button" class="btn btn-secondary phone-only" id="browseBtn" aria-controls="vaultSidebar" aria-expanded="false">Browse</button>
                 {% if capture_path %}<a href="/" class="capture-back">Vault</a>{% endif %}
                 <span id="currentFile">Select a file</span>
                 <div class="toolbar-actions">
-                    <button id="searchBtn" class="btn btn-secondary" title="Search vault (Cmd+Shift+S)">🔍 Search <span class="shortcut-hint">⌘⇧S</span></button>
-                    <button id="quickPasteBtn" class="btn btn-primary" title="Quick paste from clipboard (Cmd+Shift+V)">📋 Paste <span class="shortcut-hint">⌘⇧V</span></button>
-                    <button id="addWebBtn" class="btn btn-primary" title="Add web page by URL (Cmd+Shift+U)">+ Web <span class="shortcut-hint">⌘⇧U</span></button>
-                    <button id="autoFileBtn" class="btn btn-secondary" title="Auto-file this document (Cmd+Shift+F)">🗂️ Auto-File <span class="shortcut-hint">⌘⇧F</span></button>
+                    <div id="secondaryActions">
+                        <button id="searchBtn" class="btn btn-secondary" title="Search vault (Cmd+Shift+S)">🔍 Search <span class="shortcut-hint">⌘⇧S</span></button>
+                        <button id="quickPasteBtn" class="btn btn-primary" title="Quick paste from clipboard (Cmd+Shift+V)">📋 Paste <span class="shortcut-hint">⌘⇧V</span></button>
+                        <button id="addWebBtn" class="btn btn-primary" title="Add web page by URL (Cmd+Shift+U)">+ Web <span class="shortcut-hint">⌘⇧U</span></button>
+                        <button id="autoFileBtn" class="btn btn-secondary" title="Auto-file this document (Cmd+Shift+F)">🗂️ Auto-File <span class="shortcut-hint">⌘⇧F</span></button>
+                        <button type="button" class="btn btn-secondary phone-only" id="useFull">Use full layout</button>
+                    </div>
                     <button id="editBtn" class="btn" style="display:none;">Edit</button>
                     <button id="previewBtn" class="btn" style="display:none;">Preview</button>
+                    <button type="button" class="btn btn-secondary phone-only" id="moreBtn" aria-controls="secondaryActions" aria-expanded="false">More</button>
                     <span id="saveStatus" class="save-status"></span>
                 </div>
             </div>
@@ -66,8 +79,8 @@
             
             <!-- Context Menu -->
             <div id="contextMenu" class="context-menu" style="display:none;">
-                <div class="context-menu-item" id="contextAddPage" style="display:none;">+ Add Page</div>
-                <div class="context-menu-item" id="contextRename">Rename</div>
+                <div class="context-menu-item" id="contextAddPage" role="button" tabindex="0" style="display:none;">+ Add Page</div>
+                <div class="context-menu-item" id="contextRename" role="button" tabindex="0">Rename</div>
             </div>
 
             <!-- Add Page Modal -->
@@ -163,6 +176,7 @@
         </main>
     </div>
     <script src="{{ url_for('static', filename='js/image-migration.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/phone-layout.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
