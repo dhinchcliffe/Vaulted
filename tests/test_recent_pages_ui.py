@@ -20,7 +20,7 @@ def vault_browser(monkeypatch):
     if not chromium:
         pytest.skip('System Chromium is required for browser tests')
 
-    names = ['One/Index.md', 'Two/Index.md'] + [f'Page {i}.md' for i in range(11)]
+    names = ['One/Index.md', 'Two/Index.md'] + [f'Page {i}.md' for i in range(101)]
     rows = [dict(id=str(i), path=name, content=f'Original page {i}', revision=1) for i, name in enumerate(names)]
     def lookup(field, value):
         for row in rows:
@@ -107,13 +107,16 @@ def test_recent_limit_and_missing_page(vault_browser):
     for row in rows[2:]:
         page.locator(f'.file[data-path="{row["path"]}"]').click()
         pw.expect(recent.first).to_have_attribute('title', row['path'])
-    pw.expect(recent).to_have_count(10)
+    pw.expect(recent).to_have_count(100)
+    page.reload()
+    pw.expect(recent).to_have_count(100)
+    pw.expect(recent.first).to_have_attribute('title', 'Page 100.md')
     pw.expect(recent.last).to_have_attribute('title', 'Page 1.md')
     removed = rows.pop(-2)
     recent.nth(1).click()
-    pw.expect(recent).to_have_count(9)
+    pw.expect(recent).to_have_count(99)
     assert removed['path'] not in recent.evaluate_all('(items) => items.map(item => item.title)')
-    pw.expect(page.locator('#currentFile')).to_have_text('Page 10.md')
+    pw.expect(page.locator('#currentFile')).to_have_text('Page 100.md')
 
 
 def test_search_open_with_browser_storage_unavailable(vault_browser):
