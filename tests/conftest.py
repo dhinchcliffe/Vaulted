@@ -18,6 +18,8 @@ def vault_browser(monkeypatch, request):
     chromium = os.environ.get('CHROMIUM_EXECUTABLE_PATH') or shutil.which('chromium')
     if not chromium:
         pytest.skip('System Chromium is required for browser tests')
+    options = dict(getattr(request, 'param', {}))
+    allow_saves = options.pop('allow_saves', False)
 
     names = ['One/Index.md', 'Two/Index.md'] + [f'Page {i}.md' for i in range(101)]
     rows = [dict(id=str(i), path=name, content=f'Original page {i}', revision=1) for i, name in enumerate(names)]
@@ -31,16 +33,30 @@ def vault_browser(monkeypatch, request):
     vault.rows.side_effect = lambda: rows
     vault.get.side_effect = lambda path: lookup('path', path)
     vault.get_by_id.side_effect = lambda file_id: lookup('id', file_id)
+    vault.file_exists.side_effect = lambda path: any(row['path'] == path for row in rows)
     def create(path, content):
         rows.append(dict(id=str(len(rows)), path=path, content=content, revision=1))
     def move(source, destination):
-        lookup('path', source)['path'] = destination
-        return {'success': True, 'new_path': destination}
+        if any(row['path'] == destination or row['path'].startswith(destination + '/') for row in rows):
+            raise VaultError('Destination already exists', 409)
+        moving = [row for row in rows if row['path'] == source or row['path'].startswith(source + '/')]
+        if not moving:
+            raise VaultError('Source not found', 404)
+        for row in moving:
+            row['path'] = destination + row['path'][len(source):]
+            row['revision'] += 1
+        return {'success': True, 'new_path': destination, 'count': len(moving)}
+    def save(path, content, revision):
+        row = lookup('path', path)
+        if not allow_saves or row['revision'] != revision:
+            raise VaultError('Save conflict', 409)
+        row.update(content=content, revision=revision + 1)
+        return {'success': True, 'revision': row['revision']}
     vault.create.side_effect = create
     vault.move.side_effect = move
     vault.call.return_value.json.return_value = [{'path': rows[0]['path']}]
     vault.search.return_value = [dict(path='Two/Index.md', preview='A match', matches=1)]
-    vault.save.side_effect = VaultError('Save conflict', 409)
+    vault.save.side_effect = save
     monkeypatch.setattr(auth, 'SupabaseVault', lambda token: vault)
     monkeypatch.setitem(app.config, 'SECRET_KEY', 'test-only')
     client = app.test_client()
@@ -60,7 +76,7 @@ def vault_browser(monkeypatch, request):
 
     with pw.sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path=chromium)
-        context = browser.new_context(**getattr(request, 'param', {}))
+        context = browser.new_context(**options)
         context.route('**/*', serve)
         page = context.new_page()
         yield page, rows, requests

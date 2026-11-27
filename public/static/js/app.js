@@ -140,7 +140,9 @@ async function init() {
     if (capturePath) {
         await loadFile(capturePath);
     } else if (lastFile) {
-        await loadFile(lastFile);
+        const lastRow = physicalTree.querySelector(`.file[data-path="${CSS.escape(lastFile)}"]`);
+        // A rename in another session or a repaired filename can stale the saved path.
+        await loadFile(lastRow ? lastFile : pagePaths.get(recentIds[0]) || lastFile);
     } else {
         // Load first markdown file
         await loadFirstFile();
@@ -1092,8 +1094,9 @@ function openRenameModal() {
     modal.style.display = 'flex';
 
     // Set current name as default
-    const parts = contextMenuTarget.path.split('/');
-    input.value = parts[parts.length - 1];
+    const name = contextMenuTarget.path.split('/').pop();
+    input.value = contextMenuTarget.type === 'file' ? name.replace(/\.md$/, '') : name;
+    input.defaultValue = input.value;
     input.focus();
     input.select();
 }
@@ -1105,26 +1108,28 @@ function closeRenameModal() {
 }
 
 async function confirmRename() {
-    if (!await saveFile()) return;
-    if (!contextMenuTarget) return;
+    const btn = document.getElementById('confirmRenameBtn');
+    if (btn.disabled || !contextMenuTarget) return;
+    const target = contextMenuTarget;
+    const oldPath = target.path;
 
     const input = document.getElementById('renameInput');
     const newName = input.value.trim();
-    if (!newName || newName === contextMenuTarget.path.split('/').pop()) {
+    if (!newName || newName === input.defaultValue) {
         closeRenameModal();
         return;
     }
 
-    const btn = document.getElementById('confirmRenameBtn');
     btn.textContent = 'Renaming...';
     btn.disabled = true;
 
     try {
+        if (!await saveFile()) return;
         const response = await fetch('/api/rename', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                path: contextMenuTarget.path,
+                path: oldPath,
                 new_name: newName
             })
         });
@@ -1132,13 +1137,14 @@ async function confirmRename() {
         const data = await response.json();
 
         if (data.success) {
-            // Store paths before closing modal clears them
-            const oldPath = contextMenuTarget.path;
             const newPath = data.new_path;
-            closeRenameModal();
+            if (contextMenuTarget === target) closeRenameModal();
             // Update the open path before refreshing both navigation views.
             if (currentFile === oldPath || (currentFile && currentFile.startsWith(oldPath + '/'))) {
                 currentFile = newPath + currentFile.slice(oldPath.length);
+                // The move trigger adds one revision. Keep any concurrent edit ahead
+                // of this editor's revision so the normal save conflict check still works.
+                if (newPath !== oldPath) currentRevision += 1;
                 writePreference('vaulted_lastFile', currentFile);
                 displayCurrentPath(currentFile);
             }

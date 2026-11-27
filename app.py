@@ -148,7 +148,14 @@ def capture():
 @app.post('/api/rename')
 def rename():
     d=request.get_json();source=valid_path(d.get('path',''));name=clean_name(d.get('new_name',''))
-    return jsonify(g.vault.move(source,posixpath.join(posixpath.dirname(source),name)))
+    # Directories are inferred from descendants. Even a directory ending in .md
+    # has no file record at its own path. Check only when the suffix needs repair.
+    if source.endswith('.md') and not name.endswith('.md') and g.vault.file_exists(source):
+        name = name[:-3] + '.md' if name.lower().endswith('.md') else name + '.md'
+    target = posixpath.join(posixpath.dirname(source), name)
+    if target == source:
+        return jsonify(success=True, new_path=source, count=0)
+    return jsonify(g.vault.move(source,target))
 @app.post('/api/move-file')
 def move():
     d=request.get_json();source=valid_path(d.get('from_path',''))

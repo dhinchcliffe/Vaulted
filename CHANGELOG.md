@@ -1,3 +1,10 @@
+# 2026-11-27 — keep renamed pages visible and editable
+
+- Rename edits the title of a Markdown page. The server preserves the lowercase .md suffix, including for older clients. Folder names retain their original semantics, and the existing move operation rejects occupied destinations.
+- Carry the open editor's revision forward by the single move-trigger increment, preserving concurrent edit detection. When reopening the vault, recover a stale last-file path from the recent page's stable ID.
+- The live repair restored the suffix on two records in place. Both document bodies matched pre-rename versions, and all seven referenced archived images matched their stored SHA-256 hashes.
+- Recovery point: `baseline/before-rename-safety-2026-11-27` at `e1dee58`.
+
 # 2026-11-27 — reveal recent pages in the physical tree
 
 - Selecting a recent page opens the original by ID, expands its parent folders and brings the selected physical row into view. On phones, Browse stays open for this action. Ordinary file taps still return to the document.
