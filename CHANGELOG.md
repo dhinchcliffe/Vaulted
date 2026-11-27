@@ -1,3 +1,8 @@
+# 2026-11-27 — longer recent page history
+
+- Raised the browser's recently used page limit from 10 to 100. Existing entries carry over and new visits fill the remaining slots.
+- Recovery point: `baseline/before-recent-limit-100-2026-11-27` at `f1793fe`.
+
 # 2026-11-27 — recently used pages
 
 - Added an expandable dark green section at the top of the navigation tree. It lists the last 10 distinct pages opened in this browser, newest first, and remembers when collapsed.
