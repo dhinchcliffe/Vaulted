@@ -100,7 +100,7 @@ def test_touch_node_actions_hold_and_scroll(vault_browser):
     assert page.evaluate('String(getSelection())') == ''
     assert not any('/api/file?' in path for _, path in requests)
     page.locator('#contextRename').tap()
-    pw.expect(page.locator('#renameInput')).to_have_value('Index.md')
+    pw.expect(page.locator('#renameInput')).to_have_value('Index')
     page.locator('#renameModal .modal-close').tap()
 
     touch('touchStart', [{'x': x, 'y': y}])
@@ -127,7 +127,7 @@ def test_folder_add_and_file_rename_target_real_nodes(vault_browser):
     page.locator('#browseBtn').tap()
     page.get_by_role('button', name='Actions for Two/Field notes.md', exact=True).tap()
     page.locator('#contextRename').tap()
-    page.locator('#renameInput').fill('Renamed.md')
+    page.locator('#renameInput').fill('Renamed')
     page.locator('#confirmRenameBtn').tap()
     pw.expect(page.get_by_role('button', name='Actions for Two/Renamed.md')).to_be_visible()
     page.locator('#closeDrawer').tap()

@@ -36,6 +36,9 @@ class SupabaseVault:
             if len(batch)<1000:return out
     def get(self,path):
         return self._get_one({'path':'eq.'+path})
+    def file_exists(self,path):
+        rows=self.call('GET','/rest/v1/vault_files',params={'path':'eq.'+path,'select':'id','limit':1}).json()
+        return bool(rows)
     def get_by_id(self,file_id):
         return self._get_one({'id':'eq.'+file_id})
     def _get_one(self,lookup):
