@@ -331,7 +331,7 @@ async function loadFile(path, recentId = null) {
         
         // Highlight in tree
         physicalTree.querySelector('.tree-item.active')?.classList.remove('active');
-        const treeItem = document.querySelector(`.tree-item[data-path="${CSS.escape(path)}"]`);
+        const treeItem = physicalTree.querySelector(`.tree-item.file[data-path="${CSS.escape(path)}"]`);
         if (treeItem) {
             treeItem.classList.add('active');
         }
@@ -354,8 +354,12 @@ async function loadFile(path, recentId = null) {
             }
             renderRecentPages();
         }
-        if (pathChanged) await loadFileTree();
-        phoneLayout?.closeDrawer();
+        if (recentId) {
+            if (pathChanged || !treeItem) await loadFileTree();
+            highlightTreeItem(path, {focus: true});
+        } else {
+            phoneLayout?.closeDrawer();
+        }
         
     } catch (error) {
         phoneLayout?.navigationError('Could not open the page. Try again.');
@@ -952,7 +956,7 @@ document.addEventListener('click', (e) => {
 });
 
 // Highlight a tree item and scroll it into view
-function highlightTreeItem(path) {
+function highlightTreeItem(path, {focus = false} = {}) {
     // Expand parent directories
     const pathParts = path.split('/');
     pathParts.pop(); // Remove the item itself, keep parent dirs
@@ -960,7 +964,7 @@ function highlightTreeItem(path) {
     let currentPath = '';
     for (const part of pathParts) {
         currentPath = currentPath ? `${currentPath}/${part}` : part;
-        const dirEl = document.querySelector(`.tree-item.directory[data-path="${CSS.escape(currentPath)}"]`);
+        const dirEl = physicalTree.querySelector(`.tree-item.directory[data-path="${CSS.escape(currentPath)}"]`);
         if (dirEl && dirEl.classList.contains('collapsed')) {
             dirEl.classList.remove('collapsed');
             dirEl.classList.add('expanded');
@@ -973,8 +977,15 @@ function highlightTreeItem(path) {
     saveTreeState();
 
     // Find and highlight the item
-    const itemEl = document.querySelector(`.tree-item[data-path="${CSS.escape(path)}"]`);
+    const itemEl = physicalTree.querySelector(`.tree-item[data-path="${CSS.escape(path)}"]`);
     if (itemEl) {
+        if (focus) {
+            // The loaded file already has the persistent active highlight.
+            itemEl.tabIndex = -1;
+            itemEl.focus({preventScroll: true});
+            itemEl.scrollIntoView({block: 'center', inline: 'nearest'});
+            return;
+        }
         itemEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         // Flash highlight effect
         itemEl.style.transition = 'background 0.3s';

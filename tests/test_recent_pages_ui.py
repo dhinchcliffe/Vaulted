@@ -23,6 +23,7 @@ def test_recent_pages_follow_original_and_preserve_editor(vault_browser):
     pw.expect(page.locator('#preview')).to_have_text('Original page 0')
     pw.expect(recent.first).to_have_attribute('title', 'Moved/Renamed.md')
     pw.expect(page.locator('#physicalTree .active')).to_have_attribute('data-path', 'Moved/Renamed.md')
+    pw.expect(page.locator('#physicalTree .active')).to_be_in_viewport()
     pw.expect(recent).to_have_count(2)
 
     heading = page.locator('#recentPages > summary')
@@ -41,6 +42,39 @@ def test_recent_pages_follow_original_and_preserve_editor(vault_browser):
     pw.expect(page.locator('#saveStatus')).to_contain_text('Save conflict')
     pw.expect(page.locator('#editor')).to_have_value('Unsaved edit')
     pw.expect(recent.first).to_have_attribute('aria-current', 'page')
+    pw.expect(page.locator('#physicalTree .active')).to_have_attribute('data-path', 'Moved/Renamed.md')
+
+
+@pytest.mark.parametrize('vault_browser', [
+    {'viewport': {'width': 1440, 'height': 900}},
+    {'viewport': {'width': 834, 'height': 1194}, 'has_touch': True, 'is_mobile': True},
+    {'viewport': {'width': 390, 'height': 844}, 'has_touch': True, 'is_mobile': True},
+], ids=['desktop', 'ipad', 'phone'], indirect=True)
+def test_recent_selection_reveals_physical_row(vault_browser):
+    page, rows, requests = vault_browser
+    rows[1]['path'] = 'Two/Field notes/Index.md'
+    page.add_init_script("""localStorage.setItem('vaulted_recentPageIds',
+        JSON.stringify(Array.from({length: 100}, (_, index) => String(index))))""")
+    page.goto('http://vaulted.test/')
+    pw.expect(page.locator('#editBtn')).to_be_visible()
+    if page.locator('#browseBtn').is_visible():
+        page.locator('#browseBtn').tap()
+    original = page.locator('#physicalTree .file[data-path="Two/Field notes/Index.md"]')
+    pw.expect(original).to_be_hidden()
+    alias = page.locator('#recentPageList [data-recent-id="1"]')
+    requests.clear()
+    if page.evaluate('navigator.maxTouchPoints'):
+        alias.tap()
+    else:
+        alias.click()
+    pw.expect(page.locator('#physicalTree .active')).to_have_attribute('data-path', rows[1]['path'])
+    pw.expect(original).to_be_in_viewport()
+    pw.expect(original).to_be_focused()
+    pw.expect(page.locator('#physicalTree .directory.expanded')).to_have_count(2)
+    assert requests == [('GET', '/api/file?id=1')]
+    if page.locator('#closeDrawer').is_visible():
+        page.locator('#closeDrawer').tap()
+    pw.expect(page.locator('#preview')).to_have_text('Original page 1')
 
 
 def test_recent_limit_and_missing_page(vault_browser):

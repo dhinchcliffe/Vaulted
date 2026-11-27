@@ -1,3 +1,8 @@
+# 2026-11-27 — reveal recent pages in the physical tree
+
+- Selecting a recent page opens the original by ID, expands its parent folders and brings the selected physical row into view. On phones, Browse stays open for this action. Ordinary file taps still return to the document.
+- Recovery point: `baseline/before-recent-tree-reveal-2026-11-27` at `b07493a`.
+
 # 2026-11-27 — phone navigation and touch tree menus
 
 - On narrow touch screens, Browse opens the existing vault tree and search over the full-width editor. Edit or Preview stays on the toolbar. More contains Paste, Web, Auto-File and a remembered full-layout option. Dismissing Browse preserves the draft and reading position. A failed save keeps the drawer open and reports the conflict.
