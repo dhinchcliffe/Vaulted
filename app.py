@@ -42,9 +42,13 @@ def status():
 def first():return jsonify(path=next((r['path'] for r in g.vault.rows() if r['path'].endswith('.md')),None))
 @app.get('/api/file')
 def get_file():
-    row=g.vault.get(valid_path(request.args.get('path','')))
+    if 'id' in request.args:
+        row=g.vault.get_by_id(request.args['id'])
+        valid_path(row['path'])
+    else:
+        row=g.vault.get(valid_path(request.args.get('path','')))
     if row['content'] is None:raise VaultError('Not a Markdown document')
-    return jsonify(content=row['content'],path=row['path'],revision=row['revision'],
+    return jsonify(id=row['id'],content=row['content'],path=row['path'],revision=row['revision'],
                    external_image_count=external_image_count(row['content'],request.host_url))
 @app.post('/api/file')
 def save_file():

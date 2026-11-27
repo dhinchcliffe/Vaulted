@@ -83,7 +83,7 @@ def authenticated_client(monkeypatch):
     import app
     from vaulted import auth
     app.app.config.update(TESTING=True,SECRET_KEY='test-only')
-    vault=Mock();vault.get.return_value={'content':'Note ![image]('+URL+')','revision':7,'path':'Research/note.md'}
+    vault=Mock();vault.get.return_value={'id':'note-id','content':'Note ![image]('+URL+')','revision':7,'path':'Research/note.md'}
     vault.save.return_value={'success':True,'revision':8}
     monkeypatch.setattr(auth,'SupabaseVault',Mock(return_value=vault))
     client=app.app.test_client()
@@ -96,7 +96,24 @@ def test_file_load_counts_without_downloading(authenticated_client,monkeypatch):
     client,vault=authenticated_client;download=Mock();monkeypatch.setattr(images,'store_remote_image',download)
     response=client.get('/api/file?path=Research/note.md')
     assert response.json['external_image_count']==1
+    assert response.json['id']=='note-id'
     download.assert_not_called();vault.store_image.assert_not_called()
+
+
+def test_recent_page_loads_at_current_path(authenticated_client):
+    client,vault=authenticated_client
+    vault.get_by_id.return_value={**vault.get.return_value,'path':'Renamed/note.md'}
+    response=client.get('/api/file?id=note-id')
+    assert response.status_code==200
+    assert (response.json['id'],response.json['path'])==('note-id','Renamed/note.md')
+    vault.get_by_id.assert_called_once_with('note-id')
+    vault.get.assert_not_called()
+
+
+def test_recent_id_cannot_open_hidden_file(authenticated_client):
+    client,vault=authenticated_client
+    vault.get_by_id.return_value={**vault.get.return_value,'path':'.obsidian/note.md'}
+    assert client.get('/api/file?id=note-id').status_code==403
 
 
 def test_stale_revision_rejected_before_network(authenticated_client,monkeypatch):

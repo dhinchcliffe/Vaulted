@@ -35,7 +35,11 @@ class SupabaseVault:
             out.extend(batch)
             if len(batch)<1000:return out
     def get(self,path):
-        rows=self.call('GET','/rest/v1/vault_files',params={'path':'eq.'+path,'select':'*','limit':1}).json()
+        return self._get_one({'path':'eq.'+path})
+    def get_by_id(self,file_id):
+        return self._get_one({'id':'eq.'+file_id})
+    def _get_one(self,lookup):
+        rows=self.call('GET','/rest/v1/vault_files',params={**lookup,'select':'*','limit':1}).json()
         if not rows:raise VaultError('File not found',404)
         return rows[0]
     def save(self,path,content,revision):
@@ -65,7 +69,7 @@ def build_tree(rows):
         if not path.endswith('.md') or any(x.startswith('.') for x in path.split('/')):continue
         parts=path.split('/');node=root
         for i,name in enumerate(parts):
-            if i==len(parts)-1:node[name]={'name':name,'path':path,'type':'file'}
+            if i==len(parts)-1:node[name]={'id':row['id'],'name':name,'path':path,'type':'file'}
             else:node=node.setdefault(name,{'name':name,'path':'/'.join(parts[:i+1]),'type':'directory','_children':{}})['_children']
     def finish(node):
         values=list(node.values())

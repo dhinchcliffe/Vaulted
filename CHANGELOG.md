@@ -1,3 +1,9 @@
+# 2026-11-27 — recently used pages
+
+- Added an expandable dark green section at the top of the navigation tree. It lists the last 10 distinct pages opened in this browser, newest first, and remembers when collapsed.
+- Recent entries store only file IDs locally. They open the original at its current path through the existing authenticated file endpoint, including after a rename or folder move. The section uses the tree already loaded and adds no database writes or schema changes.
+- Recovery point: `baseline/before-recent-pages-2026-11-27` at `30e991f`.
+
 # 2026-11-25 — migrate external images on existing pages
 
 - Baseline: baseline/before-image-migration-prompt-2026-11-25 at d36a3b8.
