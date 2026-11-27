@@ -5,8 +5,8 @@ from vaulted.capture import safe_fetch
 def test_invalid_paths(path):
     with pytest.raises(VaultError):valid_path(path)
 def test_tree_is_portable():
-    tree=build_tree([{'path':'Z.md'},{'path':'A/B.md'},{'path':'.obsidian/config.json'}])
-    assert tree[0]['children'][0]['path']=='A/B.md'
+    tree=build_tree([{'id':'z','path':'Z.md'},{'id':'b','path':'A/B.md'},{'id':'h','path':'.obsidian/config.json'}])
+    assert tree[0]['children'][0]=={'id':'b','path':'A/B.md','name':'B.md','type':'file'}
     assert len(tree)==2
 @pytest.mark.parametrize('url',['http://127.0.0.1/','http://169.254.169.254/','file:///etc/passwd','http://localhost/','https://example.com:8443/'])
 def test_capture_blocks_private_and_non_web(url):

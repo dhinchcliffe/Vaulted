@@ -31,7 +31,11 @@
             </div>
             
             <div class="tree" id="fileTree">
-                <div class="loading">Loading vault...</div>
+                <details id="recentPages" open>
+                    <summary class="tree-item recent-heading"><span class="icon icon-folder" aria-hidden="true"></span>Recently used</summary>
+                    <div class="tree-children" id="recentPageList"></div>
+                </details>
+                <div id="physicalTree"><div class="loading">Loading vault...</div></div>
             </div>
         </aside>
         <main class="content">

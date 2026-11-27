@@ -26,7 +26,12 @@ window.addEventListener('beforeunload', event => {
     if (currentFile && editor.value !== currentContent) { event.preventDefault(); event.returnValue = ''; }
 });
 // DOM Elements
-const fileTree = document.getElementById('fileTree');
+const physicalTree = document.getElementById('physicalTree');
+const recentPages = document.getElementById('recentPages');
+const recentPageList = document.getElementById('recentPageList');
+const pagePaths = new Map();
+const recentLimit = 10;
+const recentKey = 'vaulted_recentPageIds';
 const preview = document.getElementById('preview');
 const editor = document.getElementById('editor');
 const currentFileLabel = document.getElementById('currentFile');
@@ -54,6 +59,67 @@ currentFileLabel.style.cursor = 'pointer';
 currentFileLabel.title = 'Click to reveal in tree';
 currentFileLabel.addEventListener('click', revealCurrentFileInTree);
 
+// Browser preferences are optional. The editor also works when storage is unavailable.
+function readPreference(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function writePreference(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* Keep using the in-memory state. */ }
+}
+
+function readRecentIds() {
+    try {
+        const ids = JSON.parse(readPreference(recentKey));
+        return Array.isArray(ids) ? [...new Set(ids.filter(id => typeof id === 'string'))].slice(0, recentLimit) : [];
+    } catch { return []; }
+}
+
+let recentIds = readRecentIds();
+recentPages.open = readPreference('vaulted_recentCollapsed') !== 'true';
+recentPages.addEventListener('toggle', () => writePreference('vaulted_recentCollapsed', String(!recentPages.open)));
+window.addEventListener('storage', event => {
+    if (event.key === recentKey || event.key === null) {
+        recentIds = readRecentIds();
+        renderRecentPages();
+    }
+});
+
+function renderRecentPages() {
+    const focusedId = document.activeElement?.dataset.recentId;
+    const fragment = document.createDocumentFragment();
+    const pages = recentIds.filter(id => pagePaths.has(id));
+    const names = pages.map(id => pagePaths.get(id).split('/').pop());
+    pages.forEach((id, index) => {
+        const path = pagePaths.get(id);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'tree-item recent-page';
+        button.dataset.recentId = id;
+        button.title = path;
+        if (path === currentFile) {
+            button.classList.add('active');
+            button.setAttribute('aria-current', 'page');
+        }
+        const icon = document.createElement('span');
+        icon.className = 'icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = '📝';
+        const name = names[index];
+        button.append(icon, names.indexOf(name) === names.lastIndexOf(name) ? name : path);
+        button.addEventListener('click', () => loadFile(path, id));
+        fragment.append(button);
+    });
+    if (!pages.length) {
+        const empty = document.createElement('div');
+        empty.className = 'recent-empty';
+        empty.textContent = 'No recent pages';
+        fragment.append(empty);
+    }
+    recentPageList.replaceChildren(fragment);
+    if (focusedId) recentPageList.querySelector(`[data-recent-id="${CSS.escape(focusedId)}"]`)?.focus({preventScroll: true});
+}
+
 // Initialize
 async function init() {
     await loadVaultStatus();
@@ -61,7 +127,7 @@ async function init() {
     
     // Try to load last opened file from localStorage
     const capturePath = document.body.dataset.capturePath;
-    const lastFile = localStorage.getItem('vaulted_lastFile');
+    const lastFile = readPreference('vaulted_lastFile');
     if (capturePath) {
         await loadFile(capturePath);
     } else if (lastFile) {
@@ -106,15 +172,18 @@ async function loadFileTree() {
     try {
         const response = await fetch('/api/tree');
         const tree = await response.json();
-        renderTree(tree);
+        if (!response.ok || !Array.isArray(tree)) throw new Error('Invalid tree response');
+        pagePaths.clear();
+        renderTree(tree, physicalTree);
+        renderRecentPages();
     } catch (error) {
-        fileTree.innerHTML = '<div class="loading">Error loading vault</div>';
+        physicalTree.innerHTML = '<div class="loading">Error loading vault</div>';
         console.error('Failed to load file tree:', error);
     }
 }
 
 // Render tree recursively
-function renderTree(items, container = fileTree, level = 0, savedExpanded = null) {
+function renderTree(items, container, level = 0, savedExpanded = null) {
     if (level === 0) {
         container.innerHTML = '';
         // Get saved expanded state at root level and pass it down
@@ -141,6 +210,8 @@ function renderTree(items, container = fileTree, level = 0, savedExpanded = null
             });
             setupTreeItemContextMenu(div, item.path, 'directory');
         } else {
+            if (item.id) pagePaths.set(item.id, item.path);
+            div.classList.toggle('active', item.path === currentFile);
             div.innerHTML = `
                 <span class="icon">📝</span>
                 <span>${escapeHtml(item.name)}</span>
@@ -182,13 +253,13 @@ function saveTreeState() {
     document.querySelectorAll('.tree-item.directory.expanded').forEach(el => {
         expandedPaths.push(el.dataset.path);
     });
-    localStorage.setItem('vaulted_expandedPaths', JSON.stringify(expandedPaths));
+    writePreference('vaulted_expandedPaths', JSON.stringify(expandedPaths));
 }
 
 // Get saved tree state from localStorage
 function getSavedTreeState() {
     try {
-        return JSON.parse(localStorage.getItem('vaulted_expandedPaths') || '[]');
+        return JSON.parse(readPreference('vaulted_expandedPaths') || '[]');
     } catch (e) {
         return [];
     }
@@ -210,21 +281,28 @@ async function loadFirstFile() {
 }
 
 // Load a file
-async function loadFile(path) {
+async function loadFile(path, recentId = null) {
     if (switchingFile) return;
     switchingFile = true;
     clearTimeout(saveTimeout);
     try {
         if (currentFile && editor.value !== currentContent && !await saveFile()) return;
-        const response = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
+        const query = recentId ? {id: recentId} : {path};
+        const response = await fetch('/api/file?' + new URLSearchParams(query));
         const data = await response.json();
         
-        if (data.error) {
+        if (!response.ok || data.error) {
+            if (recentId && response.status === 404) {
+                pagePaths.delete(recentId);
+                renderRecentPages();
+            }
             saveStatus.textContent = data.error;
             console.error('Error loading file:', data.error);
             return;
         }
         
+        const pathChanged = recentId && path !== data.path;
+        path = data.path;
         currentFile = path;
         currentContent = data.content;
         currentRevision = data.revision;
@@ -235,10 +313,10 @@ async function loadFile(path) {
         renderPreview(currentContent);
         
         // Save to localStorage
-        localStorage.setItem('vaulted_lastFile', path);
+        writePreference('vaulted_lastFile', path);
         
         // Highlight in tree
-        document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('active'));
+        physicalTree.querySelector('.tree-item.active')?.classList.remove('active');
         const treeItem = document.querySelector(`.tree-item[data-path="${CSS.escape(path)}"]`);
         if (treeItem) {
             treeItem.classList.add('active');
@@ -254,6 +332,15 @@ async function loadFile(path) {
         isEditing = false;
         updateView();
         imageMigration.show(data.external_image_count || 0);
+        if (data.id) {
+            pagePaths.set(data.id, path);
+            if (recentIds[0] !== data.id) {
+                recentIds = [data.id, ...recentIds.filter(id => id !== data.id)].slice(0, recentLimit);
+                writePreference(recentKey, JSON.stringify(recentIds));
+            }
+            renderRecentPages();
+        }
+        if (pathChanged) await loadFileTree();
         
     } catch (error) {
         console.error('Failed to load file:', error);
@@ -1015,14 +1102,13 @@ async function confirmRename() {
             const oldPath = contextMenuTarget.path;
             const newPath = data.new_path;
             closeRenameModal();
-            // Refresh tree
-            await loadFileTree();
-            // If renamed file was open, update currentFile and reload
+            // Update the open path before refreshing both navigation views.
             if (currentFile === oldPath || (currentFile && currentFile.startsWith(oldPath + '/'))) {
                 currentFile = newPath + currentFile.slice(oldPath.length);
-                localStorage.setItem('vaulted_lastFile', currentFile);
+                writePreference('vaulted_lastFile', currentFile);
                 currentFileLabel.textContent = currentFile;
             }
+            await loadFileTree();
             // Highlight and scroll to the renamed item
             highlightTreeItem(newPath);
             saveStatus.textContent = 'Renamed';
